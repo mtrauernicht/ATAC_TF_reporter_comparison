@@ -14,7 +14,11 @@ output:
     code_folding: show  # Users can expand/collapse code
     df_print: paged  # Paginate long tables instead of cluttering the page
     toc: true
+<<<<<<< HEAD
     toc_depth: 2  # Limits TOC depth for clarity`
+=======
+    toc_depth: 2  # Limits TOC depth for clarity
+>>>>>>> a359f06d5945801bff2871e5b2ebb31ba680e226
     toc_float: 
       collapsed: true  # Keeps TOC clean, expandable when needed
       smooth_scroll: true  # Smooth scrolling when clicking TOC links
