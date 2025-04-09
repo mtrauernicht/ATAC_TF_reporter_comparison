@@ -50,6 +50,7 @@ library(ggplot2)
 library(data.table)
 library(scales)
 library(ggh4x)
+library(ggpubr)
 
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 ```
@@ -58,7 +59,7 @@ library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 
 ```{r load_data}
 setwd("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses")
-exp <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20240715.rds")
+exp <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
 ```
 
 ### Setup Aesthetics
@@ -184,21 +185,19 @@ df <- data.frame(
 )
 
 ggplot(df, aes(x = interaction(celltype, replicate), y = dup)) +
-  geom_point(aes(color = treatment), size = 3) +
+  geom_point(size = 2) +
   ggtitle("Read duplication") +
   theme(plot.title = element_text(hjust = 0.5, color = "black", size = 16, face = "bold")) +
-  geom_hline(yintercept = 0.5, colour = "purple", linetype = 2) +
+  geom_hline(yintercept = 0.5, colour = "black", linetype = 2) +
   scale_y_continuous(labels = percent_format(accuracy = 1),
                      name = "Duplicated Reads",
                      limits = c(0, NA),
                      expand = c(0, 0, 0.1, 0)) +
-  # scale_x_discrete(name = NULL) +
-  # scale_shape_manual(
-  #   name = "Treatment",
-  #   values = c(25, 21:24)
-  # ) +
-  theme(aspect.ratio = NULL,
-        axis.text.x = element_text(angle = 90, vjust = 0.5, margin = margin(t = 2.2, b = 2.2)))
+  theme_pubr(x.text.angle = 45) +
+  theme(aspect.ratio = 1) +
+  xlab("Replicate") +
+  labs_pubr() +
+  facet_wrap(~run)
 ```
 
 ### Mitochondrial reads
@@ -266,26 +265,21 @@ df <- data.frame(
 )
 
 ggplot(df, aes(x = interaction(celltype, replicate), y = tss)) +
-  geom_point(size = 3) +
+  geom_point(size = 2) +
   ggtitle("TSS enrichment") +
   theme(
     plot.title = element_text(hjust = 0.5, color = "black", size = 16, face = "bold"),
     axis.text.x = element_text(angle = 90, vjust = 0.5, margin = margin(t = 2.2, b = 2.2))
   ) +
-  geom_hline(yintercept = 4, colour = "purple", linetype = 2) +
-  facet_grid(~ celltype, scales = "free_x", space = "free_x") +
+  geom_hline(yintercept = 4, colour = "black", linetype = 2) +
   scale_y_continuous(
     name = "Fold Enrichment",
     limits = c(0, NA)
   ) +
-  # scale_x_discrete(name = NULL) +
-  # scale_shape_manual(
-  #   name = "Treatment",
-  #   values = c(25, 21:24)
-  # ) +
-  # Replace scale_fill_celltype with scale_fill_manual if specific colors are needed
-  # scale_fill_manual(values = c("Color1", "Color2")) +
-  theme(aspect.ratio = NULL)
+  theme_pubr() +
+  labs_pubr() +
+  theme(aspect.ratio = 1) +
+  xlab("Replicate")
 ```
 
 ### Fraction of Reads in Peaks
@@ -302,30 +296,22 @@ df <- data.frame(
 )
 
 ggplot(df, aes(x = interaction(celltype, replicate), y = frip)) +
-  geom_point(size = 3) +
+  geom_point(size = 2) +
   ggtitle("Fraction of reads in peaks") +
   theme(
     plot.title = element_text(hjust = 0.5, color = "black", size = 16, face = "bold"),
     axis.text.x = element_text(angle = 90, vjust = 0.5, margin = margin(t = 2.2, b = 2.2))
   ) +
-  facet_grid(~ celltype, scales = "free_x", space = "free_x") +
-  geom_hline(yintercept = 0.1, colour = "purple", linetype = 2) +
+  geom_hline(yintercept = 0.1, colour = "black", linetype = 2) +
   scale_y_continuous(
     name = "Fraction of Reads in Peaks",
     limits = c(0, NA),
     expand = c(0, 0, 0.1, 0)
   ) +
-  # scale_x_discrete(name = NULL) +
-  # scale_shape_manual(
-  #   name = "Treatment",
-  #   values = c(25, 21:24)
-  # ) +
-  # # Assuming you need to manually set fill colors for 'celltype', replace with scale_fill_manual
-  # scale_fill_manual(
-  #   name = "Cell Type",
-  #   values = c("CellType1" = "Color1", "CellType2" = "Color2") # Replace with actual cell types and colors
-  # ) +
-  theme(aspect.ratio = NULL)
+  theme_pubr() +
+  labs_pubr() +
+  theme(aspect.ratio = 1) +
+  xlab("Replicate")
 ```
 
 ### Fragment length distribution
