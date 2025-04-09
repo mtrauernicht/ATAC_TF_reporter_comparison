@@ -1,0 +1,354 @@
+---
+title: "Multiplexed identification of TF-specific reporters"
+author: 
+  - name: "Max Trauernicht"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute - van Steensel lab"
+
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output:
+  html_document:
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+---
+
+---
+
+### Aim
+~36,000 reporters for 86 TFs were transfected into 9 different cell types + treated with ~90 different siRNAs or various signaling molecules. In this script I will analyze TF reporter activities in detail and review how individual reporters respond to TF concentration variations.
+
+---
+
+## Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+    $(document).ready(function() {
+      $items = $('div#TOC li');
+      $items.each(function(idx) {
+        num_ul = $(this).parentsUntil('#TOC').length;
+        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+      });
+
+    });
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+  overflow-x: hidden;
+}
+```
+
+### Libraries 
+
+```{r setup, out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(RColorBrewer)
+library(ggplot2)
+library(dplyr)
+library(maditr)
+library(tibble)
+library(pheatmap)
+library(ggpubr)
+library(visNetwork)
+library(ggbeeswarm)
+library(ggforce)
+library(viridis)
+library(plyr)
+library(igraph)
+library(ggraph)
+library(cowplot)
+library(gridExtra)
+library(pROC)
+library(tidyr)
+library(stringr)
+library(randomForest)
+library(ggrastr)
+library(readr)
+library(ggbiplot)
+library(IHW)
+library(biomaRt)
+library(ggh4x)
+library(ggiraph)
+library(plotly)
+library(AMR)
+library(umap)
+library(ggrepel)
+library(chromVAR)
+library(motifmatchr)
+library(Matrix)
+library(SummarizedExperiment)
+library(BiocParallel)
+library(JASPAR2016)
+library(BSgenome.Mmusculus.UCSC.mm10)
+library(BSgenome.Hsapiens.UCSC.hg38)
+```
+
+### Functions
+
+```{r out.width= "80%", fig.align= "center"}
+### Custom functions
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+
+
+# Extract p-value from linear model
+lmp <- function (modelobject) {
+    if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+
+# Set custom ggplot2 theme and custom colors
+theme_classic_lines <- function() {
+  theme_pubr(border = F, legend = "top") +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+
+theme_classic_lines_45 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 45) +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+
+theme_classic_lines_90 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 90) +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+
+theme_barplot <- function() {
+  theme_pubr(border = T, legend = "none") +
+            theme(panel.grid.major.x = element_line(colour = "black", linewidth = 0.25),
+                  strip.background = element_blank(),
+                  strip.text = element_text(face="bold", hjust=0)
+            )
+}
+
+theme_set(theme_classic_lines())
+
+colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
+
+cell_colors <- c("A549" = "#f2cc8f", "HCT116" = "#ED1C24", "HEK293" = "#00B4D8", 
+                               "HepG2" = "#B3B3B3", "K562" = "#A67C52", "MCF7" = "#81B29A", 
+                               "U2OS" = "#3D405B", "mES" = "#EAB69F", "NPC" = "#E07A5F")
+
+ggplot_custom <- function(...) ggplot2::ggplot(...) + 
+  scale_color_manual(values = colors_diverse) + 
+  scale_fill_manual(values = colors_diverse)
+```
+
+### Loading ATAC-seq data - mouse cells
+
+```{r out.width= "80%", fig.align= "center"}
+# Import peak count information for ChromVAR
+peak_count <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
+assayNames(peak_count) <- "counts"
+
+# Filter samples
+#peak_count <- peak_count[, !peak_count@colData$run %in% c(8010, 8011)] ## Run separately for each seq run
+#peak_count <- peak_count[, peak_count@colData$celltype == "mES"] ## Run seperately for each cell type
+min_samples <- 2  # Adjust as needed
+valid_groups <- names(which(table(peak_count@colData$treatment) >= min_samples))
+peak_count <- peak_count[, peak_count@colData$treatment %in% valid_groups]
+
+# Add GC bias
+peak_count <- addGCBias(peak_count, genome = BSgenome.Mmusculus.UCSC.mm10)
+
+## Filter peaks - each peak must have at least one count in one condition
+peak_count <- filterPeaks(sort(peak_count), non_overlapping = TRUE)
+
+## Extract metadata
+metadata <- data.frame(peak_count@colData) %>%
+  rownames_to_column("sample") %>%
+  distinct(sample, run, celltype, treatment, replicate)
+
+
+# Import motif information
+seq_logos <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/lambert_2018/seq_logos.rds")
+motifs_selected <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/lambert_2018/motifs_selected.rds") %>%
+  mutate(tf = toupper(tf)) %>%
+  mutate(tf = ifelse(tf == "AHR:ARNT", "AHR::ARNT", tf)) %>%
+  mutate(tf = ifelse(tf == "RAR:RXR", "RARA:RXRA", tf)) %>%
+  rbind(data.frame(tf = c("STAT1", "STAT4", "ATF2", "ATF4", "ATF6", "CLOCK"),
+                   motif_id = c("M06794_1.94d.txt", "M06797_1.94d.txt", "M08481_1.94d.txt", "M08489_1.94d.txt", "M09435_1.94d.txt", "M05596_1.94.txt")))
+  
+seq_logos_pwm <- list()
+for (i in names(seq_logos)) {
+  if (i %in% motifs_selected$motif_id) {
+  seq_logos_pwm[[i]] <- universalmotif::convert_motifs(seq_logos[[i]], class = "TFBSTools-PWMatrix")
+  seq_logos_pwm[[i]]@name <- i
+  seq_logos_pwm[[i]]@strand <- "+-"
+  }
+}
+# 
+# seq_logos_pwm <- list()
+# for (i in names(seq_logos)) {
+#   seq_logos_pwm[[i]] <- universalmotif::convert_motifs(seq_logos[[i]], class = "TFBSTools-PWMatrix")
+#   name_tf <- all_motifs$tf[all_motifs$motif_id == i]
+#   seq_logos_pwm[[i]]@name <- name_tf
+#   seq_logos_pwm[[i]]@strand <- "+-"
+# }
+# 
+
+seq_logos_pwm_all <- do.call(TFBSTools::PWMatrixList, seq_logos_pwm)
+
+motif_ix <- matchMotifs(seq_logos_pwm_all, peak_count, 
+                        genome = BSgenome.Mmusculus.UCSC.mm10)
+```
+
+---
+
+### Run chromVAR
+```{r out.width= "80%", fig.align= "center"}
+# Compute deviations
+#bg <- getBackgroundPeaks(object = sox2_peak_count_gc_filt)
+dev <- computeDeviations(object = peak_count, annotations = motif_ix
+                         #,background_peaks = bg
+                         )
+
+dev_dif <- differentialDeviations(dev, group = peak_count@colData$treatment)
+
+dev_scores <- deviationScores(dev) %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "motif_id") %>%
+  left_join(motifs_selected) %>%
+  pivot_longer(cols = -c(motif_id, tf), names_to = "sample", values_to = "chromVAR_zscore") %>%
+  # mutate(replicate = gsub(".*(R[1-3]{1}$)", "\\1", sample)) %>%
+  mutate(condition = gsub("_R[1-3]{1}$", "", sample)) %>%
+  left_join(metadata, by = "sample") %>%
+  mutate(sample = gsub("\\.1$", "", sample)) %>%
+  mutate(sample = paste(sample, run, sep = "_")) %>%
+  mutate(chromVAR_zscore_mean = ave(chromVAR_zscore, motif_id, condition, FUN = mean)) %>%
+  distinct(motif_id, tf, condition, run, replicate, chromVAR_zscore_mean, chromVAR_zscore)
+
+dev_scores_ctrl <- dev_scores %>%
+  filter(condition %in% c("mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT", "NPC_DMSO")) %>%
+  mutate(replicate = as.character(replicate)) %>%
+  dplyr::select("ref_condition" = condition, "ctrl_zscore" = chromVAR_zscore, tf, replicate, run) %>%
+  mutate(replicate = ifelse(ref_condition == "NPC_DMSO", "R1", replicate)) %>%
+  mutate(run = ifelse(ref_condition == "NPC_DMSO", 8010, run)) %>%
+  mutate(replicate = as.factor(replicate)) 
+
+condition_match <- data.frame(condition = c("mES_LIF", "mES_PD", "mES_CH", "mES_FOXA1_OE", "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_TFCP2L1", "mES_SP1",
+                                            "mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "mES_HQ_1h", "mES_HQ_3h", "mES_HQ_6h", "mES_10PD", "mES_FBS", 
+                                            "mES_FK", "mES_vitC", "mES_Heat", "mES_PMA", "mES_Nutlin", "mES_FK_new", "NPC_HQ", "NPC_cGAMP", "NPC_FK"),
+                              ref_condition = c("mES_2i_LIF", "mES_2i_LIF", "mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT",
+                                                "mES_NT",
+                                                "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT",
+                                                "mES_NT", "mES_NT", "mES_NT","mES_NT", "mES_NT", "mES_NT", "NPC_DMSO", "NPC_DMSO", "NPC_DMSO"))
+
+dev_scores_dif <- dev_scores %>%
+  left_join(condition_match) %>%
+  left_join(dev_scores_ctrl) %>%
+  mutate(chromVAR_zscore_dif = chromVAR_zscore - ctrl_zscore) %>%
+  mutate(chromVAR_zscore_dif_mean = ave(chromVAR_zscore_dif, tf, condition, FUN = function (x) mean(x, na.rm = T)))
+
+# Compute variability
+variability <- computeVariability(dev)
+
+plotVariability(variability, use_plotly = FALSE)
+
+saveRDS(dev_scores_dif, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025_mouse_all.rds")
+```
+
+---
+
+## ChromVAR on the human conditions
+
+### Loading data
+
+```{r out.width= "80%", fig.align= "center"}
+# Import peak count information for ChromVAR
+peak_count <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20241003_human.rds")
+assayNames(peak_count) <- "counts"
+
+# Add GC bias
+peak_count <- addGCBias(peak_count, genome = BSgenome.Hsapiens.UCSC.hg38)
+
+## Filter peaks - each peak must have at least one count in one condition
+peak_count <- filterPeaks(GenomicRanges::sort(peak_count), non_overlapping = TRUE)
+
+motif_ix <- matchMotifs(seq_logos_pwm_all, peak_count, 
+                        genome = BSgenome.Hsapiens.UCSC.hg38)
+```
+
+---
+
+### Run chromVAR
+```{r out.width= "80%", fig.align= "center"}
+# Compute deviations
+#bg <- getBackgroundPeaks(object = sox2_peak_count_gc_filt)
+dev <- computeDeviations(object = peak_count, annotations = motif_ix
+                         #,background_peaks = bg
+                         )
+
+dev_dif <- differentialDeviations(dev, group = peak_count@colData$treatment)
+
+dev_scores <- deviationScores(dev) %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "motif_id") %>%
+  left_join(motifs_selected) %>%
+  pivot_longer(cols = -c(motif_id, tf), names_to = "sample", values_to = "chromVAR_zscore") %>%
+  mutate(replicate = gsub(".*(.[1-3]{1}$)", "\\1", sample)) %>%
+  mutate(condition = gsub("_.[1-3]{1}$", "", sample)) %>%
+  mutate(chromVAR_zscore_mean = ave(chromVAR_zscore, motif_id, condition, FUN = mean)) %>%
+  distinct(motif_id, tf, condition, replicate, chromVAR_zscore_mean, chromVAR_zscore)
+
+dev_scores_ctrl <- dev_scores %>%
+  filter(condition %in% c("U2OS_DMSO", "MCF7_DMSO")) %>%
+  dplyr::select("ref_condition" = condition, "ctrl_zscore" = chromVAR_zscore, tf, replicate) 
+
+condition_match <- data.frame(condition = c("U2OS_PMA", "U2OS_Heat", "U2OS_Calcitriol", "MCF7_Hexestrol"),
+                              ref_condition = c("U2OS_DMSO", "U2OS_DMSO", "U2OS_DMSO", "MCF7_DMSO"))
+
+dev_scores_dif <- dev_scores %>%
+  left_join(condition_match) %>%
+  left_join(dev_scores_ctrl) %>%
+  mutate(chromVAR_zscore_dif = chromVAR_zscore - ctrl_zscore) %>%
+  mutate(chromVAR_zscore_dif_mean = ave(chromVAR_zscore_dif, tf, condition, FUN = mean))
+
+# Compute variability
+variability <- computeVariability(dev)
+
+plotVariability(variability, use_plotly = FALSE)
+
+saveRDS(dev_scores_dif, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_human.rds")
+```
+
+
+
+
+
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+

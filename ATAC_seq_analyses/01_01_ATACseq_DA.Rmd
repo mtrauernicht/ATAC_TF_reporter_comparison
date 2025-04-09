@@ -64,7 +64,7 @@ library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 
 setwd("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses")
 
-exp <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20240715.rds")
+exp <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20241003.rds")
 ```
 
 ### Setup Aesthetics
@@ -329,16 +329,8 @@ ggplot(df, aes(pc1, pc2)) +
     y = paste0("PC2 (", percent(varexp[2], 0.1), ")")
   ) +
   coord_equal() +
-  theme(aspect.ratio = NULL,
-        axis.line = element_blank(),
-        axis.ticks = element_blank(),
-        legend.position = "bottom",
-        legend.box = "vertical",
-        legend.box.just = "left",
-        legend.box.spacing = unit(0, "cm"),
-        legend.box.margin = margin(),
-        legend.spacing.y = unit(0, "cm"),
-        legend.margin = margin())
+  labs_pubr() +
+  theme_pubr()
 
 vardf <- data.frame(x = seq_along(varexp), y = varexp)
 
@@ -355,8 +347,6 @@ ggplot(vardf, aes(x, y)) +
                      name = "PC #") +
   theme(aspect.ratio = (1 + sqrt(5))/2,
         panel.grid.major.x = element_blank())
-
-pcplot | varplot
 ```
 
 
@@ -370,19 +360,14 @@ clust <- reorder(clust, dist = dist, method = "OLO")
 
 df <- reshape2::melt(cor(norm, method = 'spearman'))
 
-cluster <- ggplot(df, aes(Var1, Var2, fill = value)) +
+ggplot(df, aes(Var1, Var2, fill = value)) +
   geom_raster() +
   guides(y.sec = "axis", x.sec = guide_axis(position = "bottom")) +
   GENOVA:::scale_fill_GENOVA_div(name = expression("Spearman's "*rho)) +
-  scale_x_dendrogram(hclust = clust, name = NULL,
-                     guide = guide_dendro(label = FALSE, position = "top")) +
-  scale_y_dendrogram(hclust = clust, name = NULL,
-                     guide = guide_dendro(label = FALSE)) +
-  theme(axis.text.x.bottom = element_text(angle = 90, hjust = 1, vjust = 0.5))
+  labs_pubr() +
+  theme_pubr(x.text.angle = 90) +
+  theme(aspect.ratio = 1)
 
-# pdf(file="/DATA/usr/t.filipovska/projects/ATAC-seq_TF-footprinting/analysis/Plots/clustering_HepG2_K562.pdf")
-print(cluster)
-# dev.off()
 ```
 ## Annotating peaksto genes
 ```{r}
@@ -454,10 +439,36 @@ ggmaplot(diff_acc, main = expression("SOX2_ctrl" %->% "SOX2_DEG"),
    ggtheme = ggplot2::theme_bw())
 
 
-diff_acc <- results(exp1, contrast = c("treatment", "LIF", "POU5F1_ctrl"))
+diff_acc <- results(exp1, contrast = c("treatment", "LIF", "2i_LIF"))
 diff_acc$name <- 1:nrow(diff_acc)
 
-ggmaplot(diff_acc, main = expression("POU5F1_ctrl" %->% "LIF"),
+ggmaplot(diff_acc, main = expression("2i_LIF" %->% "LIF"),
+   fdr = 0.05, fc = 0.5, size = 1,
+   palette = c("#B31B21", "#1465AC", "darkgray"),
+   genenames = as.vector(diff_acc$name),
+   legend = "top", top = 100,
+   font.label = c("bold", 11),
+   font.legend = "bold",
+   font.main = "bold",
+   ggtheme = ggplot2::theme_bw())
+
+diff_acc <- results(exp1, contrast = c("treatment", "CH", "2i_LIF"))
+diff_acc$name <- 1:nrow(diff_acc)
+
+ggmaplot(diff_acc, main = expression("2i_LIF" %->% "CH"),
+   fdr = 0.05, fc = 0.5, size = 1,
+   palette = c("#B31B21", "#1465AC", "darkgray"),
+   genenames = as.vector(diff_acc$name),
+   legend = "top", top = 100,
+   font.label = c("bold", 11),
+   font.legend = "bold",
+   font.main = "bold",
+   ggtheme = ggplot2::theme_bw())
+
+diff_acc <- results(exp1, contrast = c("treatment", "PD", "2i_LIF"))
+diff_acc$name <- 1:nrow(diff_acc)
+
+ggmaplot(diff_acc, main = expression("2i_LIF" %->% "PD"),
    fdr = 0.05, fc = 0.5, size = 1,
    palette = c("#B31B21", "#1465AC", "darkgray"),
    genenames = as.vector(diff_acc$name),
@@ -469,76 +480,13 @@ ggmaplot(diff_acc, main = expression("POU5F1_ctrl" %->% "LIF"),
 ```
 
 
-```{r}
 
-par(mfrow=c(1,1))
-with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot"))
-with(subset(res,padj<0.01), points(log2FoldChange, -log10(pvalue),pch=20,col="blue"))
-with(subset(res,padj<0.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
-```
-
-#### HepG2
-
-```{r}
-
-ggmaplot(diff_acc, main = expression("mES" %->% "K562"),
-   fdr = 0.05, fc = 0.5, size = 1,
-   palette = c("#B31B21", "#1465AC", "darkgray"),
-   genenames = as.vector(diff_acc$names),
-   legend = "top", top = 100,
-   font.label = c("bold", 11),
-   font.legend = "bold",
-   font.main = "bold",
-   ggtheme = ggplot2::theme_bw())
-```
-
-```{r}
-##add more information to df
-
-exp2 <- data.frame(rowRanges(exp))
-
-exp_df$start <- exp2$start
-exp_df$end <- exp2$end
-exp_df$peak_name <- exp2$name
-exp_df$chr <- exp2$seqnames
-```
-
-#### Sox2
-
-```{r}
-sox2 <- wrap_ma_plots(time$sox2)
-sox2$plot
-```
-
-```{r}
-parallel_sets_plot(sox2$data)
-```
-
-
-#### Nanog
-
-```{r}
-nanog <- wrap_ma_plots(time$nanog)
-nanog$plot
-```
-
-```{r}
-parallel_sets_plot(nanog$data)
-```
-
-### Interaction effects {.tabset}
-
-We'll be doing two tests for interactions. First we do the log-ratio test (LRT), which essentially tests for every gene if it is significantly better modelled by the interaction factor across all time points. We use this as a measure of global interaction. 
-
-```{r}
-interact <- list()
-```
 
 
 #### Oct4-Sox2
 
 ```{r}
-lrt <- exps$oct4
+lrt <- exp$oct4
 lrt <- lrt[, lrt$tag != "NANOG"]
 lrt$tag <- droplevels(lrt$tag)
 lrt <- nbinomLRT(lrt, reduced = ~ run + tag + time)

@@ -64,3 +64,4 @@ ATAC_seq_analyses/tornado
 ATAC_seq_analyses/diffTF
 TF_reporter_analyses/old
 data/
+TF_reporter_analyses/data
