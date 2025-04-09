@@ -60,4 +60,7 @@ ATAC_seq_analyses/bed_peaks
 ATAC_seq_analyses/bigwig
 ATAC_seq_analyses/tabix
 ATAC_seq_analyses/tea_scripts
+ATAC_seq_analyses/tornado
+ATAC_seq_analyses/diffTF
 TF_reporter_analyses/old
+data/
