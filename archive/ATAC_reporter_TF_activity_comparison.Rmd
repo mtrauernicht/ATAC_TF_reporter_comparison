@@ -3,8 +3,9 @@ title: "Comparison of ATAC-seq inferred activity with TF reporter activity"
 author: 
   - name: "Max Trauernicht"
     email: "m.trauernicht@nki.nl"
-    affiliation: "Netherlands Cancer Institute / University of Twente"
-date: '20/02/2025'
+    affiliation: "Netherlands Cancer Institute - van Steensel lab"
+
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
 output: 
   html_document:
     theme: flatly  # Modern, professional look
@@ -13,7 +14,11 @@ output:
     code_folding: show  # Users can expand/collapse code
     df_print: paged  # Paginate long tables instead of cluttering the page
     toc: true
+<<<<<<< HEAD
+    toc_depth: 2  # Limits TOC depth for clarity`
+=======
     toc_depth: 2  # Limits TOC depth for clarity
+>>>>>>> a359f06d5945801bff2871e5b2ebb31ba680e226
     toc_float: 
       collapsed: true  # Keeps TOC clean, expandable when needed
       smooth_scroll: true  # Smooth scrolling when clicking TOC links
@@ -60,8 +65,10 @@ Date <- substr(gsub("-","",Sys.time()),1,8)
 library(RColorBrewer)
 library(ggplot2)
 library(dplyr)
+library(maditr)
 library(tibble)
 library(pheatmap)
+library(ggpubr)
 library(visNetwork)
 library(ggbeeswarm)
 library(ggforce)
@@ -75,6 +82,7 @@ library(gridExtra)
 library(pROC)
 library(tidyr)
 library(stringr)
+library(randomForest)
 library(ggrastr)
 library(readr)
 library(ggbiplot)
@@ -86,7 +94,8 @@ library(plotly)
 library(AMR)
 library(umap)
 library(ggrepel)
-library(chromVAR)
+#library(chromVAR)
+#library(motifmatchr)
 library(Matrix)
 library(SummarizedExperiment)
 library(BiocParallel)
@@ -117,44 +126,47 @@ lmp <- function (modelobject) {
     return(p)
 }
 
-theme_custom <- theme(
-  text = element_text(size = 12),
-  
-  # Remove panel background
-  panel.background = element_blank(),
-  
-  # Customize grid lines: Keep both major X and Y grid lines, make them thinner
-  panel.grid = element_blank(),
-  panel.grid.major = element_line(colour = "#e3e1e1", linetype = 1, size = 0.3),
-  
-  # Ensure axis lines and ticks are visible
-  axis.line = element_line(colour = "black"),
-  axis.ticks = element_line(colour = "black"),
-  
-  # Make axis ticks longer
-  axis.ticks.length = unit(7, "pt"),  # Adjust the length as needed
-  
-  # Add an outside border to the plotting area
-  panel.border = element_rect(colour = "black", fill = NA, size = .5),
-  
-  # Ensure facet (strip) outline matches the panel border thickness
-  strip.background = element_rect(fill = "grey90", colour = "black", size = .5),
-  strip.text = element_text(face = "bold"),
-  
-  # Adjust plot layout
-  plot.title.position = "plot",
-  legend.position = "top",
-  legend.title = element_blank()
-)
-
-theme_set(theme_minimal() + theme_custom)
-
-# Function to force axes to start at zero
-force_zero_axes <- function(p) {
-  p + 
-    scale_x_continuous(expand = c(0, 0), limits = c(0, NA)) +
-    scale_y_continuous(expand = c(0, 0), limits = c(0, NA))
+# Set custom ggplot2 theme and custom colors
+theme_classic_lines <- function() {
+  theme_pubr(border = F, legend = "top") +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
 }
+
+theme_classic_lines_45 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 45) +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+
+theme_classic_lines_90 <- function() {
+  theme_pubr(border = T, legend = "top", x.text.angle = 90) +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
+                  strip.background = element_rect(fill = "#ced4da")
+            )
+}
+
+theme_barplot <- function() {
+  theme_pubr(border = T, legend = "none") +
+            theme(panel.grid.major.x = element_line(colour = "black", linewidth = 0.25),
+                  strip.background = element_blank(),
+                  strip.text = element_text(face="bold", hjust=0)
+            )
+}
+
+theme_set(theme_classic_lines())
+
+colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
+
+cell_colors <- c("A549" = "#f2cc8f", "HCT116" = "#ED1C24", "HEK293" = "#00B4D8", 
+                               "HepG2" = "#B3B3B3", "K562" = "#A67C52", "MCF7" = "#81B29A", 
+                               "U2OS" = "#3D405B", "mES" = "#EAB69F", "NPC" = "#E07A5F")
+
+ggplot_custom <- function(...) ggplot2::ggplot(...) + 
+  scale_color_manual(values = colors_diverse) + 
+  scale_fill_manual(values = colors_diverse)
 ```
 
 ### Loading reporter activities
