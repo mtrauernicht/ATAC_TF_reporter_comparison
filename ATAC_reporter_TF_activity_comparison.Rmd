@@ -78,8 +78,6 @@ library(stringr)
 library(ggrastr)
 library(readr)
 library(ggbiplot)
-library(IHW)
-library(biomaRt)
 library(ggh4x)
 library(ggiraph)
 library(plotly)
@@ -90,9 +88,9 @@ library(chromVAR)
 library(Matrix)
 library(SummarizedExperiment)
 library(BiocParallel)
-library(JASPAR2016)
 library(BSgenome.Mmusculus.UCSC.mm10)
 library(BSgenome.Hsapiens.UCSC.hg38)
+library(ggnewscale)
 ```
 
 ### Functions
@@ -162,19 +160,19 @@ force_zero_axes <- function(p) {
 ```{r out.width= "80%", fig.align= "center"}
 # Import TF reporter activities (only of the identified prime reporters)
 ## Import reporter activities
-cDNA_df <- read.csv("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/TF_reporter_analyses/mt20240724_reporter_activity_filt_combined_complete.csv", header = T) %>%
+cDNA_df <- read.csv("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240724_reporter_activity_filt_combined_complete.csv", header = T) %>%
   mutate(tf = gsub("_.*", "", tf))
 
 # Load RNA-seq data
 tf_rna <- read_tsv("/DATA/usr/m.trauernicht/data/RNA_seq/rna_tpm_all_tfs.tsv")
 
 ## Import prime reporters
-prime_reporters <- read_csv("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/best_reporters.csv") %>%
-  filter(conf_level > 1)
+prime_reporters <- read_csv("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/best_reporters.csv") #%>%
+  #filter(conf_level > 1)
 
 prime_activities <- cDNA_df %>%
   filter(reporter_id %in% prime_reporters$reporter_id) %>%
-  distinct(tf, condition, reporter_activity_dif_sample, replicate, reporter_activity_minP) %>%
+  distinct(tf, condition, reporter_activity_dif_sample, replicate, reporter_activity_minP, "ctrl_activity" = reference_activity_minP) %>%
   mutate(reporter_activity_dif_sample = ave(reporter_activity_dif_sample, tf, condition, replicate, FUN = function(x) mean(x, na.rm = T))) %>%
   mutate(reporter_activity_minP = ave(reporter_activity_minP, tf, condition, replicate, FUN = function(x) mean(x, na.rm = T))) %>%
   distinct() %>%
@@ -195,8 +193,44 @@ read_and_process <- function(file) {
 data_list <- map(file_paths, read_and_process)
 primetime_activities <- bind_rows(data_list) %>%
   mutate(condition = gsub("_DMOS", "", condition)) %>%
-  mutate(condition = gsub("_DMSO", "", condition)) %>%  
+  mutate(condition = gsub("_DMSO", "", condition)) %>%
   filter(!condition %in% c("ITO60_T_vs_H", "U2OS_DMSO_Calc_v1", "U2OS_DMSO_Calc_v1_5", "U2OS_DMSO_Calc_v2", "U2OS_DMSO_Calc_v2_5"))
+
+
+## Import primetime-computed activities of all conditions
+base_dir <- "/DATA/usr/m.trauernicht/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT"
+sub_dirs <- list.dirs(base_dir, recursive = FALSE)
+file_paths <- file.path(sub_dirs, "primetime_results", "primetime_results.txt")
+file_paths <- file_paths[file.exists(file_paths)]
+read_and_process <- function(file) {
+  data <- read_delim(file) %>%
+    select(logFC, tf, p_adjusted, sig, "ctrl_activity" = DMSO) %>%  # Keep only selected columns
+    mutate(condition = basename(dirname(dirname(file))))  # Extract unique subdirectory name
+  return(data)
+}
+data_list <- map(file_paths, read_and_process)
+primetime_activities_all <- bind_rows(data_list) %>%
+  filter(str_detect(tf, "RANDOM", negate = T))
+
+primetime_activities_all_1 <- primetime_activities_all %>%
+  filter(condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
+  mutate(condition = ifelse(condition == "mES_LIF24", "mES_LIF", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_SOX2", "mES_SOX2_DEG", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_POU5F1", "mES_POU5F1_DEG", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_FOXA1", "mES_FOXA1_OE", condition)) %>%
+  dplyr::select(-logFC, -ctrl_activity)
+
+primetime_activities_all_2 <- primetime_activities_all %>%
+  filter(!condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
+  distinct(tf, condition, logFC, p_adjusted, sig, ctrl_activity)
+
+
+prime_activities_comb <- prime_activities %>%
+  filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG", "mES_SOX2_DEG")) %>%
+  dplyr::select(tf, condition, "logFC" = reporter_activity_dif_sample, replicate, ctrl_activity) %>%
+  left_join(primetime_activities_all_1)
+
+prime_activities_comb <- rbind.fill(prime_activities_comb, primetime_activities_all_2)
 ```
 
 ---
@@ -244,6 +278,101 @@ ggplot(chromvar_scores_mouse_comb, aes(x = old_chromVAR, y = new_chromVAR)) +
 
 ---
 
+## Plot chromVAR z-scores upon SOX2 degradation
+
+```{r}
+chromvar_scores_mouse_added_sox2 <- chromvar_scores_mouse_added_all %>%
+  filter(condition %in% c("mES_SOX2_DEG")) %>%
+  distinct(tf, condition, chromVAR_zscore_mean, p_value, ctrl_zscore) %>%
+  mutate(ctrl_zscore = ave(ctrl_zscore, tf, FUN = function(x) mean(x))) %>%
+  distinct() %>%
+  mutate(
+    sig = case_when(
+      p_value < 0.05 & ctrl_zscore > chromVAR_zscore_mean ~ "Downregulated",
+      p_value < 0.05 & ctrl_zscore < chromVAR_zscore_mean ~ "Upregulated", TRUE ~ "NS"), 
+    sig = factor(sig, levels = c("NS", "Downregulated", "Upregulated"))) %>%
+  mutate(color_axis = ifelse(sig == "Upregulated", "#f37f80", ifelse(sig == "NS", "gray30", "#6495ed"))) %>%
+  arrange(desc(ctrl_zscore)) %>%
+  mutate(tf = factor(tf, levels = unique(tf))) %>%
+  distinct(tf, .keep_all = T) %>%
+  arrange(desc(ctrl_zscore)) %>%
+  mutate(tf = factor(tf, levels = unique(tf)))
+
+
+chromvar_scores_mouse_added_sox2 %>%
+            ggplot() +
+            geom_segment(aes(
+                y = ctrl_zscore, 
+                yend = chromVAR_zscore_mean,
+                x = tf, xend = tf,
+                color = sig
+            ), size = 1) +
+            scale_color_manual(
+                values = c("NS" = "grey", "Downregulated" = "#6495ed", "Upregulated" = "#f37f80"),
+                name = "Result of\nComparative\nAnalysis"
+            ) +
+            new_scale_color() +
+            geom_point(aes(x = tf, y = ctrl_zscore, color = "C"), size = 3) +
+            geom_point(aes(x = tf, y = chromVAR_zscore_mean, color = sig), size = 3) +
+            scale_color_manual(values = c('C'= "black", "NS" = "grey", "Downregulated" = "#6495ed", "Upregulated" = "#f37f80")) +
+            guides(color = "none") +
+            theme_bw() +
+            theme(
+                axis.text.x = element_text(
+                    angle = 90, hjust = 1, vjust = 0.5,
+                    color = chromvar_scores_mouse_added_sox2$color_axis
+                ),
+                # Remove inner lines of y-axis
+                panel.grid.major.y = element_blank(),
+                panel.grid.minor.y = element_blank(),
+                text = element_text(size = 14)
+            ) +
+            labs(
+                y = "Activity (log2(RPM+1))",
+                x = "",
+                title= paste("mES_SOX2_DEG", "vs.", "mES_SOX2_ctrl")
+            )
+
+
+chromvar_scores_mouse_added_sox2 <- chromvar_scores_mouse_added_all %>%
+  filter(condition %in% c("mES_SOX2_DEG")) %>%
+  distinct(tf, condition, chromVAR_zscore_dif_mean, p_value) %>%
+  mutate(
+    sig = case_when(
+      p_value < 0.05 & chromVAR_zscore_dif_mean < 0 ~ "Downregulated",
+      p_value < 0.05 & chromVAR_zscore_dif_mean > 0 ~ "Upregulated", TRUE ~ "NS"), 
+    sig = factor(sig, levels = c("NS", "Downregulated", "Upregulated"))) 
+
+ggplot(chromvar_scores_mouse_added_sox2, aes(x = chromVAR_zscore_dif_mean, y = -log10(p_value), color = sig, alpha = sig, tf=tf)) +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
+  geom_point() +
+  # sig will be tab-blue
+  scale_color_manual(values = c("NS" = "grey", "Downregulated" = "#6495ed", "Upregulated" = "#f37f80")) +
+  scale_alpha_manual(values = c("NS" = 0.4, "Upregulated" = 1, "Downregulated" = 1)) +
+  # annotate the significant points
+  geom_label_repel(data = . %>% filter(sig != "NS"), size=5, aes(label = tf), box.padding = 0.5) +
+  guides(color = "none", alpha = "none") +
+  theme(aspect.ratio = 1)
+
+chromvar_scores_mouse_added_sox2 <- chromvar_scores_mouse_added_all %>%
+  filter(condition %in% c("mES_SOX2_DEG"), tf == "SOX2") %>%
+  distinct(chromVAR_zscore, ctrl_zscore) %>%
+  pivot_longer(ctrl_zscore:chromVAR_zscore, names_to = "type", values_to = "zscore")
+
+chromvar_scores_mouse_added_sox2_mean <- chromvar_scores_mouse_added_sox2 %>%
+  group_by(type) %>%
+  summarise(zscore = mean(zscore))
+
+ggplot() +
+  geom_bar(data = chromvar_scores_mouse_added_sox2_mean, aes(x = type, y = zscore), stat = "identity", fill = "grey") +
+  geom_point(data = chromvar_scores_mouse_added_sox2, aes(x = type, y = zscore),  width = .1, size = 3, shape = 21, fill = "grey") +
+  theme(aspect.ratio = 2.5)
+
+
+
+```
+
 
 ## Correlate conditions
 ```{r}
@@ -270,17 +399,16 @@ ggplot(chromvar_scores_mouse_comb, aes(x = chromVAR_1, y = chromVAR_2)) +
 
 ---
 
-## Correlate inferred activity with measured activity
+## Correlate inferred activity with measured activity - steady state
 ```{r}
 ## Plot inferred TF activity in mESCs
 ggplot(chromvar_scores_mouse %>% filter(condition == "mES_2i_LIF"),
        aes(x = reorder(tf, -chromVAR_zscore_mean), y = chromVAR_zscore_mean)) +
   geom_bar(stat = "identity") +
-  theme_pubr(x.text.angle = 90) +
   xlab("TF") +
   ylab("chromVAR z-score") +
-  theme(aspect.ratio = 1/4) +
-  labs_pubr()
+  theme(aspect.ratio = 1/4, 
+        axis.text.x = element_text(angle = 90, hjust = 1)) 
 
 ggplot(chromvar_scores_mouse %>% filter(condition == "mES_2i_LIF") %>%
          left_join(prime_activities %>% filter(condition == "mES_2i_LIF") %>% distinct(tf, reporter_activity_minP)) %>%
@@ -291,36 +419,50 @@ ggplot(chromvar_scores_mouse %>% filter(condition == "mES_2i_LIF") %>%
   ylim(-4, 13) +
   xlim(-4, 13) +
   geom_point() +
-  theme_pubr() +
   xlab("chromVAR z-score") +
   ylab("TF reporter activity (log2)") +
-  theme(aspect.ratio = 1) +
-  labs_pubr()
+  theme(aspect.ratio = 1) 
+```
 
+---
+
+## Replicate correlation FC - reporter activity
+```{r}
 ## Correlate chromVAR activities with measured activity
-tf_activity_chromVAR_dev <- prime_activities %>%
-  left_join(tf_rna %>% filter(cell == "mES") %>% distinct(tf, nTPM)) %>%
-  left_join(chromvar_scores_mouse %>% distinct(tf, condition, chromVAR_zscore_dif, chromVAR_zscore, replicate) #%>% mutate(replicate = ifelse(replicate == "R2", "R3", "R2"))
-            ) %>%
-  distinct(tf, reporter_activity_dif_sample, chromVAR_zscore_dif, chromVAR_zscore, replicate, condition, nTPM) %>%
-  na.omit()#%>%
-  #filter(nTPM > .1 | tf %in% c("SOX9", "FOXA1"))
+tf_activity_chromVAR_dev <- prime_activities_comb %>%
+  distinct(tf, logFC, replicate, condition)
 
 ## Correlation between replicates within assays
 tf_activity_chromVAR_dev_2 <- tf_activity_chromVAR_dev %>%
-  dplyr::select(-chromVAR_zscore_dif, -nTPM, -chromVAR_zscore) %>%
-  spread(replicate, reporter_activity_dif_sample)
+  spread(replicate, logFC)
 
 ggplot(tf_activity_chromVAR_dev_2, aes(x = R1, y = R2)) +
-  geom_text_repel(aes(label = tf), box.padding = 0.5) +
-  geom_point() +
   geom_smooth(method = "lm", color = "red") +
+  geom_hline(yintercept = 0, lty = 1) +
+  geom_vline(xintercept = 0, lty = 1) +
   geom_abline(lty = 2) +
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  geom_point(size = 3, shape = 21, fill = "grey") +
   labs(x = "Reporter activity (FC) R1", y = "Reporter activity (FC) R2") +
-  theme_pubr() +
-  labs_pubr() +
   facet_wrap(~condition)
 
+ggplot(tf_activity_chromVAR_dev_2 %>% filter(condition == "mES_SOX2_DEG"), aes(x = R1, y = R2)) +
+  geom_smooth(method = "lm", color = "red") +
+  geom_hline(yintercept = 0, lty = 1) +
+  geom_vline(xintercept = 0, lty = 1) +
+  geom_abline(lty = 2) +
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  geom_point(size = 3, shape = 21, fill = "grey") +
+  labs(x = "Reporter activity (FC) R1", y = "Reporter activity (FC) R2") +
+  facet_wrap(~condition) +
+  theme(aspect.ratio = 1)
+
+```
+
+---
+
+## Replicate correlation FC - chromVAR
+```{r}
 tf_activity_chromVAR_dev_3 <- tf_activity_chromVAR_dev %>%
   dplyr::select(-reporter_activity_dif_sample, -nTPM, -chromVAR_zscore) %>%
   spread(replicate, chromVAR_zscore_dif)
@@ -331,11 +473,25 @@ ggplot(tf_activity_chromVAR_dev_3, aes(x = R1, y = R2)) +
   geom_smooth(method = "lm", color = "red") +
   geom_abline(lty = 2) +
   labs(x = "Motif accessibility (FC) R1", y = "Motif accessibility (FC) R2") +
-  theme_pubr() +
-  labs_pubr() +
   facet_wrap(~condition)
 
+ggplot(tf_activity_chromVAR_dev_3 %>% filter(condition == "mES_SOX2_DEG"), aes(x = R1, y = R2)) +
+  geom_smooth(method = "lm", color = "red") +
+  geom_hline(yintercept = 0, lty = 1) +
+  geom_vline(xintercept = 0, lty = 1) +
+  geom_abline(lty = 2) +
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  geom_point(size = 3, shape = 21, fill = "grey") +
+  labs(x = "Motif accessibility (FC) R1", y = "Motif accessibility (FC) R2") +
+  theme(aspect.ratio = 1) +
+  ylim(-40, 20) +
+  xlim(-40, 20) 
+```
 
+---
+
+## Correlate chromVAR with primeTF
+```{r}
 ggplot(tf_activity_chromVAR_dev,
        aes(x = chromVAR_zscore_dif, y = reporter_activity_dif_sample)) +
   geom_text_repel(aes(label = tf), box.padding = 0.5) +
@@ -345,7 +501,6 @@ ggplot(tf_activity_chromVAR_dev,
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = 0, linetype = "dashed") +
   labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
-  theme_pubr(border = T) +
   theme(aspect.ratio = 1) +
   facet_grid(condition~replicate)
 
@@ -364,13 +519,11 @@ for (i in unique(tf_activity_chromVAR_dev$condition)) {
     geom_hline(yintercept = 0, linetype = "dashed") +
     geom_vline(xintercept = 0, linetype = "dashed") +
     labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
-    theme_pubr(border = T) +
     theme(aspect.ratio = 1) +
     ggtitle(i)
   
   print(p)
 }
-
 
 for (i in unique(tf_activity_chromVAR_dev$condition)) {
   p <- ggplot(tf_activity_chromVAR_dev %>%
@@ -379,7 +532,7 @@ for (i in unique(tf_activity_chromVAR_dev$condition)) {
     geom_bar(stat = "identity") +
     # add linear regression line and correlation coefficient
     labs(y = "chromVAR deviation z-score dif", x = "TF") +
-    theme_pubr(border = T, x.text.angle = 45) +
+    theme(x.text = element_text(angle = 90, hjust = 1)) +
     theme(aspect.ratio = 1) +
     ggtitle(i)
   
@@ -445,7 +598,6 @@ for (i in unique(tf_activity_chromVAR_dev$condition)) {
     geom_vline(xintercept = -2.576, linetype = "dashed") +
     labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
     scale_color_manual(values = c("Downregulated" = "#6495ED", "NS" = "grey80", "Upregulated" = "#F37F80")) +
-    #theme_pubr(border = T) +
     theme(aspect.ratio = 1) +
     ggtitle(i) +
     facet_wrap(~replicate)
@@ -453,15 +605,148 @@ for (i in unique(tf_activity_chromVAR_dev$condition)) {
   print(p)
 }
 
+## Visualize STAT3 fold-changes over time
+ggplot(tf_activity_chromVAR_dev %>%
+         filter(tf == "STAT3", condition %in% c("mESC_LIF_1h", "mESC_LIF_3h", "mESC_LIF_6h")) %>%
+         distinct(condition, logFC, chromVAR_zscore_dif) %>%
+         pivot_longer(cols = c(logFC, chromVAR_zscore_dif),
+                      values_to = "stat3_change",
+                      names_to = "method") %>%
+         mutate(stat3_change = ave(stat3_change, method, condition, FUN = mean)) %>%
+         distinct(),
+       aes(x = condition, y = stat3_change)) +
+  geom_point(aes(color = method)) +
+  #geom_line(aes(group = replicate), color = "grey") +
+  labs(x = "Condition", y = "Reporter activity (FC)") +
+  theme(aspect.ratio = 1)
+```
+
+---
+
+
+## Updated primetime analysis - all conditions
+```{r}
+## Barcode counts SOX2 reporters upon SOX2 degradation
+## Load data
+primetime_sox2_bc <- read_delim("/DATA/usr/m.trauernicht/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT/mES_SOX2/tmp_primetime/activity/cDNA_counts.txt") %>%
+  pivot_longer(cols = c(-tf, -negative_control, -promoter, -barcode),
+               names_to = "sample",
+               values_to = "reads") %>%
+  mutate(rpm = ave(reads, sample, FUN = function(x) (x) / sum(x) *1e6 )) %>%
+  filter(tf == "SOX2") %>%
+  mutate(condition = gsub("_[1-3]{1}", "", sample))
+
+primetime_pDNA <- read_delim("/DATA/usr/m.trauernicht/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT/mES_SOX2/tmp_primetime/activity/pDNA_counts.txt") %>%
+    mutate(pDNA_rpm = pDNA / sum(pDNA) *1e6 )
+  
+primetime_sox2_bc <- primetime_sox2_bc %>%
+  left_join(primetime_pDNA) %>%
+  mutate(activity = rpm / pDNA_rpm) 
+
+primetime_sox2_bc_mean <- primetime_sox2_bc %>%
+  mutate(rpm_mean = ave(rpm, condition, FUN = function(x) mean(x, na.rm = T))) %>%
+  distinct(rpm_mean, condition)
+
+ggplot() +
+  geom_bar(data = primetime_sox2_bc_mean, aes(x = condition, y = rpm_mean), stat = "identity", fill = "grey") +
+  geom_jitter(data = primetime_sox2_bc, aes(x = condition, y = rpm), width = .1, size = 3, shape = 21, fill = "grey") +
+  theme(aspect.ratio = 2.5)
+
+
+## Correlate chromVAR activities with measured activity
+tf_activity_chromVAR_dev <- prime_activities_comb %>%
+  mutate(condition = ifelse(condition == "mES_LIF1", "mES_LIF_1h", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF6", "mES_LIF_6h", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF3", "mES_LIF_3h", condition)) %>%
+  left_join(chromvar_scores_mouse_added_all %>% 
+              mutate(chromVAR_zscore_dif = ave(chromVAR_zscore_dif, tf, condition, FUN = function(x) mean(x, na.rm = T))) %>%
+              distinct(tf, condition, chromVAR_zscore_dif) %>%
+              mutate(condition = ifelse(condition == "NPC_DMSO", "NPC", condition)) %>%
+              mutate(condition = ifelse(condition == "mES_2i_LIF", "mES_NPC", condition))) %>%
+  distinct(tf, logFC, chromVAR_zscore_dif, condition, sig, ctrl_activity) %>%
+  mutate(logFC = ave(logFC, tf, condition, FUN = function(x) mean(x, na.rm = T))) %>%
+  distinct()#%>%
+#filter(nTPM > .1 | tf %in% c("SOX9", "FOXA1"))
+
+ggplot(tf_activity_chromVAR_dev %>%
+         mutate(pert_activity = ctrl_activity + logFC) %>%
+         filter(tf == "SOX2", condition %in% c("mES_SOX2_DEG")) %>%
+         distinct(pert_activity, ctrl_activity) %>%
+         pivot_longer(cols = c(pert_activity, ctrl_activity),
+                      values_to = "activity",
+                      names_to = "condition"),
+       aes(x = condition, y = activity)) +
+  geom_bar(stat = "identity", fill = "grey") +
+  geom_point(width = .1, size = 3, shape = 21, fill = "grey") +
+  theme(aspect.ratio = 2.5)
+
+tf_activity_chromVAR_dev <- prime_activities_comb %>%
+  mutate(condition = ifelse(condition == "mES_LIF1", "mES_LIF_1h", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF6", "mES_LIF_6h", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF3", "mES_LIF_3h", condition)) %>%
+  filter(!condition %in% c("mES_PMA", "mES_SP1", "NPC_FK", "NPC_HQ")) %>%
+  left_join(chromvar_scores_mouse_added_all %>% 
+              distinct(tf, condition, chromVAR_zscore_dif_mean, p_value)) %>%
+  distinct(tf, logFC, chromVAR_zscore_dif_mean, condition, sig, p_adjusted, p_value) %>%
+  mutate(logFC = ave(logFC, tf, condition, FUN = function(x) mean(x, na.rm = T))) %>%
+  distinct() %>%
+  mutate(sig_chrom = ifelse(p_value < 0.05 & chromVAR_zscore_dif_mean > 0, "Upregulated", "NS"),
+         sig_chrom = ifelse(p_value < 0.05 & chromVAR_zscore_dif_mean < 0, "Downregulated", sig_chrom))
+
+
+ggplot(tf_activity_chromVAR_dev %>%
+         mutate(condition = as.factor(condition),
+                x_sig = !is.na(p_value) & p_value < 0.05,
+                y_sig = sig != "NS",
+                low_sig = !(x_sig | y_sig)),  # insignificant for both metrics
+       aes(x = chromVAR_zscore_dif_mean, y = logFC)) +
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  # Dots with NO outline (x_sig = FALSE)
+  geom_point(data = ~ subset(., !x_sig),
+             aes(fill = sig, alpha = low_sig),
+             shape = 21, size = 2.5, stroke = 0) +
+  # Dots with black outline (x_sig = TRUE)
+  geom_point(data = ~ subset(., x_sig),
+             aes(fill = sig, alpha = low_sig),
+             shape = 21, size = 2.5, stroke = 1.2, color = "black") +
+  geom_smooth(method = "lm", color = "black") +
+  labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
+  scale_fill_manual(values = c("Downregulated" = "#6495ED", 
+                               "NS" = "grey80", 
+                               "Upregulated" = "#F37F80")) +
+  scale_alpha_manual(values = c(`TRUE` = 0.4, `FALSE` = 1), guide = "none") +
+  theme(aspect.ratio = 1) +
+  facet_wrap(~condition)
+
+
+
 
 for (i in unique(tf_activity_chromVAR_dev$condition)) {
+  
+  print(i)
+  
   p <- ggplot(tf_activity_chromVAR_dev %>%
-                filter(replicate == "R1", condition == i, abs(chromVAR_zscore_dif) > 10),
-              aes(x = reorder(tf, -chromVAR_zscore_dif), y = chromVAR_zscore_dif)) +
-    geom_bar(stat = "identity") +
-    # add linear regression line and correlation coefficient
-    labs(y = "chromVAR deviation z-score dif", x = "TF") +
-    theme_pubr(border = T, x.text.angle = 45) +
+                mutate(condition = as.factor(condition),
+                       x_sig = !is.na(p_value) & p_value < 0.05,
+                       y_sig = sig != "NS",
+                       low_sig = !(x_sig | y_sig)) %>%
+                filter(condition == i),  # insignificant for both metrics
+              aes(x = chromVAR_zscore_dif_mean, y = logFC)) +
+    geom_text_repel(aes(label = tf), box.padding = 0.5) +
+    # Dots with NO outline (x_sig = FALSE)
+    geom_point(data = ~ subset(., !x_sig),
+               aes(fill = sig, alpha = low_sig),
+               shape = 21, size = 3, stroke = 0) +
+    # Dots with black outline (x_sig = TRUE)
+    geom_point(data = ~ subset(., x_sig),
+               aes(fill = sig, alpha = low_sig),
+               shape = 21, size = 3, stroke = 1.2, color = "black") +
+    geom_smooth(method = "lm", color = "black") +
+    labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
+    scale_fill_manual(values = c("Downregulated" = "#6495ED", 
+                                 "NS" = "grey80", 
+                                 "Upregulated" = "#F37F80")) +
+    scale_alpha_manual(values = c(`TRUE` = 0.4, `FALSE` = 1), guide = "none") +
     theme(aspect.ratio = 1) +
     ggtitle(i)
   
@@ -481,11 +766,53 @@ ggplot(tf_activity_chromVAR_dev %>%
   geom_point(aes(color = method)) +
   #geom_line(aes(group = replicate), color = "grey") +
   labs(x = "Condition", y = "Reporter activity (FC)") +
-  theme_pubr(border = T, x.text.angle = 90) +
   theme(aspect.ratio = 1)
+
+
+## Only target TF - double sided bar plot
+target_conditions <- data.frame(condition = c("mES_CH", "mES_FOXA1_OE", "mES_LIF",
+                                              "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_FBS",
+                                              "mES_FK", "mES_Heat", "mES_TFCP2L1"),
+                                tf = c("TCF7", "FOXA1", "STAT3",
+                                       "POU5F1::SOX2", "SOX2", "SRF",
+                                       "CREB1", "HSF1", "TFCP2L1"))
+
+tf_activity_chromVAR_dev <- prime_activities_comb %>%
+  left_join(chromvar_scores_mouse_added_all %>% 
+              distinct(tf, condition, chromVAR_zscore_dif_mean, p_value)) %>%
+  distinct(tf, logFC, chromVAR_zscore_dif_mean, condition, sig, p_adjusted, p_value) %>%
+  mutate(logFC = ave(logFC, tf, condition, FUN = function(x) mean(x, na.rm = T))) %>%
+  distinct() %>%
+  mutate(sig_chrom = ifelse(p_value < 0.05 & chromVAR_zscore_dif_mean > 0, "Upregulated", "NS"),
+         sig_chrom = ifelse(p_value < 0.05 & chromVAR_zscore_dif_mean < 0, "Downregulated", sig_chrom))
+
+
+target_plot <- target_conditions %>%
+  left_join(tf_activity_chromVAR_dev) %>%
+  pivot_longer(cols = c(logFC, chromVAR_zscore_dif_mean),
+               values_to = "activity",
+               names_to = "method")
+
+# Create the double-sided bar plot
+ggplot(target_plot %>% filter(method == "logFC"), aes(x = tf, y = activity, fill = sig)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed") +  # Add a vertical line at x = 0
+  coord_flip() +  # Flip the plot to make it horizontal
+  scale_y_continuous(labels = abs) +  # Display positive labels for both sides
+  labs(x = "Category", y = "Value", title = "Double-Sided Bar Plot") +
+  scale_fill_manual(values = c("Upregulated" = "#F37F80", "NS" = "grey80", "Downregulated" = "#6495ED")) +
+  theme(aspect.ratio = 2)
+
+ggplot(target_plot %>% filter(method == "chromVAR_zscore_dif_mean"), aes(x = tf, y = activity, fill = sig_chrom)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed") +  # Add a vertical line at x = 0
+  coord_flip() +  # Flip the plot to make it horizontal
+  scale_y_continuous(labels = abs) +  # Display positive labels for both sides
+  labs(x = "Category", y = "Value", title = "Double-Sided Bar Plot") +
+  scale_fill_manual(values = c("Upregulated" = "#F37F80", "NS" = "grey80", "Downregulated" = "#6495ED")) +
+  theme(aspect.ratio = 2)
 ```
 
----
 
 
 
@@ -504,16 +831,19 @@ chromvar_scores_mouse_comp <- chromvar_scores_mouse %>%
   rbind(chromvar_scores_teun) %>%
   spread(source, chromVAR_zscore_dif_mean)
 
-ggplot(chromvar_scores_mouse_comp,
+ggplot(chromvar_scores_mouse_comp %>%
+         filter(condition == "SOX2"),
        aes(x = gen, y = teun)) +
-  geom_text_repel(aes(label = tf), box.padding = 0.5) +
-  geom_point() +
+  geom_hline(yintercept = 0, lty = 1) +
+  geom_vline(xintercept = 0, lty = 1) +
   geom_smooth(method = "lm", color = "red") +
   geom_abline(lty = 2) +
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  geom_point(size = 3, shape = 21, fill = "grey") +
   labs(x = "chromVAR deviation z-score dif (gen)", y = "chromVAR deviation z-score dif (teun)") +
-  theme_pubr() +
-  labs_pubr() +
-  facet_wrap(~condition)
+  theme(aspect.ratio = 1) +
+  ylim(-52, 20) +
+  xlim(-52, 20) 
 ```
 
 
@@ -523,6 +853,9 @@ ggplot(chromvar_scores_mouse_comp,
 motif_statistics <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/analyses/ATAC_degron/motif_statistics_bos_sox2_only.rds") %>%
   filter(time == "24H") %>%
   mutate(motif_name = toupper(motif_name)) %>%
+  mutate(motif_name = ifelse(motif_name == "NR1H2::RXRA", "NR1H2", motif_name)) %>%
+  mutate(motif_name = ifelse(motif_name == "RARA::RXRA", "RARA:RXRA", motif_name)) %>%
+  mutate(motif_name = ifelse(motif_name == "RXRA::VDR", "VDR:RXRA", motif_name)) %>%
   group_by(motif_name) %>%
   mutate(pval_min = min(fdr)) %>%
   filter(fdr == pval_min) %>%
@@ -536,17 +869,17 @@ motif_statistics <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/analyses/A
 
 ggplot(motif_statistics,
        aes(x = ATAC_change, y = chromVAR_zscore_dif_mean)) +
-  geom_text_repel(aes(label = tf), box.padding = 0.5) +
-  geom_point() +
+  geom_hline(yintercept = 0, lty = 1) +
+  geom_vline(xintercept = 0, lty = 1) +
   geom_smooth(method = "lm", color = "red") +
-  geom_abline(lty = 2) +
-  labs(x = "Log odds ratio (motif accessibility)", y = "chromVAR deviation z-score dif") +
-  theme_pubr() +
-  labs_pubr()
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  geom_point(size = 3, shape = 21, fill = "grey") +
+  theme(aspect.ratio = 1) +
+  labs(x = "Log odds ratio (motif accessibility)", y = "chromVAR deviation z-score dif") 
 ```
 
-
 ---
+
 
 ## Compare TF activity to RNA-seq change (DESeq2)
 ```{r}
@@ -649,7 +982,7 @@ ggplot(prime_activities_viper,
   geom_abline(lty = 2) +
   labs(x = "TF activity (VIPER)", y = "TF activity (reporters)") +
   theme_pubr(legend = "none") +
-  labs_pubr() +
+  
   facet_wrap(~condition)
 ```
 
@@ -697,7 +1030,7 @@ ggplot(prime_activities_ismara %>%
   geom_abline(lty = 2) +
   labs(x = "TF activity change (VIPER)", y = "TF activity change (reporters)") +
   theme_pubr(legend = "none") +
-  labs_pubr() +
+  
   facet_wrap(~replicate)
 
 # ggplot(prime_activities_ismara,
@@ -708,87 +1041,12 @@ ggplot(prime_activities_ismara %>%
 #   geom_abline(lty = 2) +
 #   labs(x = "TF activity (VIPER)", y = "TF activity (reporters)") +
 #   theme_pubr(legend = "none") +
-#   labs_pubr() +
+#   
 #   facet_wrap(~condition)
 ```
 
 
 
-
-
-## ChromVAR on the human conditions
-```{r}
-## Correlate chromVAR activities with measured activity
-tf_activity_chromVAR_dev <- prime_activities %>%
-  #left_join(tf_rna %>% filter(cell %in% c("U2OS", "MCF7")) %>% distinct(tf, nTPM)) %>%
-  left_join(chromvar_scores_human %>% distinct(tf, condition, chromVAR_zscore_dif, replicate) #%>% mutate(replicate = ifelse(replicate == "R2", "R3", "R2"))
-            ) %>%
-  distinct(tf, reporter_activity_dif_sample, chromVAR_zscore_dif, replicate, condition) %>%
-  na.omit()#%>%
-  #filter(nTPM > .1 | tf %in% c("SOX9", "FOXA1"))
-
-
-## Correlation between replicates within assays
-tf_activity_chromVAR_dev_2 <- tf_activity_chromVAR_dev %>%
-  dplyr::select(-chromVAR_zscore_dif) %>%
-  spread(replicate, reporter_activity_dif_sample)
-
-ggplot(tf_activity_chromVAR_dev_2, aes(x = R1, y = R2)) +
-  geom_text_repel(aes(label = tf), box.padding = 0.5) +
-  geom_point() +
-  geom_smooth(method = "lm", color = "red") +
-  geom_abline(lty = 2) +
-  labs(x = "Reporter activity (FC) R1", y = "Reporter activity (FC) R2") +
-  theme_pubr() +
-  labs_pubr() +
-  facet_wrap(~condition)
-
-tf_activity_chromVAR_dev_3 <- tf_activity_chromVAR_dev %>%
-  dplyr::select(-reporter_activity_dif_sample) %>%
-  spread(replicate, chromVAR_zscore_dif)
-
-ggplot(tf_activity_chromVAR_dev_3, aes(x = R1, y = R2)) +
-  geom_text_repel(aes(label = tf), box.padding = 0.5) +
-  geom_point() +
-  geom_smooth(method = "lm", color = "red") +
-  geom_abline(lty = 2) +
-  labs(x = "Motif accessibility (FC) R1", y = "Motif accessibility (FC) R2") +
-  theme_pubr() +
-  labs_pubr() +
-  facet_wrap(~condition)
-
-ggplot(tf_activity_chromVAR_dev,
-       aes(x = chromVAR_zscore_dif, y = reporter_activity_dif_sample)) +
-  geom_text_repel(aes(label = tf), box.padding = 0.5) +
-  geom_point() +
-  # add linear regression line and correlation coefficient
-  geom_smooth(method = "lm", color = "red") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
-  theme_pubr(border = T) +
-  facet_grid(condition~replicate)
-
-tf_activity_chromVAR_dev_mean <- tf_activity_chromVAR_dev %>%
-  filter(replicate != "R3") %>%
-  mutate(chromVAR_zscore_dif_mean = ave(chromVAR_zscore_dif, tf, condition, FUN = mean)) %>%
-  mutate(reporter_activity_dif_sample_mean = ave(reporter_activity_dif_sample, tf, condition, FUN = mean)) %>%
-  distinct(tf, condition, chromVAR_zscore_dif_mean, reporter_activity_dif_sample_mean)
-
-ggplot(tf_activity_chromVAR_dev_mean,
-       aes(x = chromVAR_zscore_dif_mean, y = reporter_activity_dif_sample_mean)) +
-  geom_text_repel(aes(label = tf), box.padding = 0.5) +
-  geom_point() +
-  # add linear regression line and correlation coefficient
-  geom_smooth(method = "lm", color = "red") +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_vline(xintercept = 0, linetype = "dashed") +
-  labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
-  theme_pubr(border = T) +
-  facet_wrap(~condition) +
-  theme(aspect.ratio = 1) +
-  labs_pubr()
-```
 
 
 # Session Info

@@ -58,10 +58,8 @@ Date <- substr(gsub("-","",Sys.time()),1,8)
 library(RColorBrewer)
 library(ggplot2)
 library(dplyr)
-library(maditr)
 library(tibble)
 library(pheatmap)
-library(ggpubr)
 library(visNetwork)
 library(ggbeeswarm)
 library(ggforce)
@@ -74,12 +72,9 @@ library(gridExtra)
 library(pROC)
 library(tidyr)
 library(stringr)
-library(randomForest)
 library(ggrastr)
 library(readr)
 library(ggbiplot)
-library(IHW)
-library(biomaRt)
 library(ggh4x)
 library(ggiraph)
 library(plotly)
@@ -87,13 +82,14 @@ library(AMR)
 library(umap)
 library(ggrepel)
 library(chromVAR)
-library(motifmatchr)
 library(Matrix)
 library(SummarizedExperiment)
 library(BiocParallel)
-library(JASPAR2016)
 library(BSgenome.Mmusculus.UCSC.mm10)
 library(BSgenome.Hsapiens.UCSC.hg38)
+library(universalmotif)
+library(motifmatchr)
+library(limma)
 ```
 
 ### Functions
@@ -117,48 +113,6 @@ lmp <- function (modelobject) {
     attributes(p) <- NULL
     return(p)
 }
-
-# Set custom ggplot2 theme and custom colors
-theme_classic_lines <- function() {
-  theme_pubr(border = F, legend = "top") +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
-            )
-}
-
-theme_classic_lines_45 <- function() {
-  theme_pubr(border = T, legend = "top", x.text.angle = 45) +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
-            )
-}
-
-theme_classic_lines_90 <- function() {
-  theme_pubr(border = T, legend = "top", x.text.angle = 90) +
-            theme(panel.grid.major = element_line(colour = "#adb5bd", linewidth = 0.25),
-                  strip.background = element_rect(fill = "#ced4da")
-            )
-}
-
-theme_barplot <- function() {
-  theme_pubr(border = T, legend = "none") +
-            theme(panel.grid.major.x = element_line(colour = "black", linewidth = 0.25),
-                  strip.background = element_blank(),
-                  strip.text = element_text(face="bold", hjust=0)
-            )
-}
-
-theme_set(theme_classic_lines())
-
-colors_diverse <- c("#264653", "#9AC1AE", "#5D987B", "#f2cc8f", "#e76f51")
-
-cell_colors <- c("A549" = "#f2cc8f", "HCT116" = "#ED1C24", "HEK293" = "#00B4D8", 
-                               "HepG2" = "#B3B3B3", "K562" = "#A67C52", "MCF7" = "#81B29A", 
-                               "U2OS" = "#3D405B", "mES" = "#EAB69F", "NPC" = "#E07A5F")
-
-ggplot_custom <- function(...) ggplot2::ggplot(...) + 
-  scale_color_manual(values = colors_diverse) + 
-  scale_fill_manual(values = colors_diverse)
 ```
 
 ### Loading ATAC-seq data - mouse cells
@@ -170,10 +124,16 @@ assayNames(peak_count) <- "counts"
 
 # Filter samples
 #peak_count <- peak_count[, !peak_count@colData$run %in% c(8010, 8011)] ## Run separately for each seq run
-#peak_count <- peak_count[, peak_count@colData$celltype == "mES"] ## Run seperately for each cell type
-min_samples <- 2  # Adjust as needed
+peak_count <- peak_count[, peak_count@colData$celltype == "mES"] 
+peak_count <- peak_count[, peak_count@colData$treatment %in% c("2i_LIF", "NT", "CH", "POU5F1_DEG", "POU5F1_ctrl", "SOX2_DEG",
+                                                               "SOX2_ctrl", "FBS", "FK", "Heat", "LIF", "LIF_1h", "LIF_3h",
+                                                               "LIF_6h", "TFCP2L1", "FOXA1_OE", "FOXA1_ctrl")] 
+peak_count <- peak_count[, peak_count@colData$basename != "1_mES_r3_TAAGGCGA-AGGCTTAG_S1"] 
+
+min_samples <- 1  # Adjust as needed
 valid_groups <- names(which(table(peak_count@colData$treatment) >= min_samples))
 peak_count <- peak_count[, peak_count@colData$treatment %in% valid_groups]
+
 
 # Add GC bias
 peak_count <- addGCBias(peak_count, genome = BSgenome.Mmusculus.UCSC.mm10)
@@ -225,14 +185,266 @@ motif_ix <- matchMotifs(seq_logos_pwm_all, peak_count,
 ### Run chromVAR
 ```{r out.width= "80%", fig.align= "center"}
 # Compute deviations
-#bg <- getBackgroundPeaks(object = sox2_peak_count_gc_filt)
+bg <- getBackgroundPeaks(object = peak_count, niterations = 2000)
 dev <- computeDeviations(object = peak_count, annotations = motif_ix
-                         #,background_peaks = bg
+                         ,background_peaks = bg
                          )
 
-dev_dif <- differentialDeviations(dev, group = peak_count@colData$treatment)
+dev_scores <- deviations(dev) %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "motif_id") %>%
+  left_join(motifs_selected) %>%
+  pivot_longer(cols = -c(motif_id, tf), names_to = "sample", values_to = "chromVAR_zscore") %>%
+  # mutate(replicate = gsub(".*(R[1-3]{1}$)", "\\1", sample)) %>%
+  mutate(condition = gsub("_R[1-4]{1}$", "", sample)) %>%
+  left_join(metadata, by = "sample") %>%
+  mutate(sample = gsub("\\.1$", "", sample)) %>%
+  mutate(sample = paste(sample, run, sep = "_")) %>%
+  mutate(chromVAR_zscore_mean = ave(chromVAR_zscore, motif_id, condition, FUN = mean)) %>%
+  distinct(motif_id, tf, condition, run, replicate, chromVAR_zscore_mean, chromVAR_zscore)
 
-dev_scores <- deviationScores(dev) %>%
+# dev_scores_ctrl <- dev_scores %>%
+#   filter(condition %in% c("mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT")) %>%
+#   mutate(replicate = as.character(replicate)) %>%
+#   dplyr::select("ref_condition" = condition, "ctrl_zscore" = chromVAR_zscore, tf, replicate, run) %>%
+#   mutate(replicate = ifelse(ref_condition == "NPC_DMSO", "R1", replicate)) %>%
+#   mutate(run = ifelse(ref_condition == "NPC_DMSO", 8010, run)) %>%
+#   mutate(replicate = as.factor(replicate)) 
+
+
+condition_match <- data.frame(condition = c("mES_LIF", "mES_CH", "mES_FOXA1_OE", "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_TFCP2L1", 
+                                            "mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "mES_FBS", 
+                                            "mES_FK", "mES_Heat"),
+                              ref_condition = c("mES_2i_LIF",  "mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT",
+                                                "mES_NT", "mES_NT", "mES_NT", "mES_NT",
+                                                "mES_NT", "mES_NT"))
+
+# dev_scores_dif <- dev_scores %>%
+#   left_join(condition_match) %>%
+#   left_join(dev_scores_ctrl) %>%
+#   mutate(chromVAR_zscore_dif = chromVAR_zscore - ctrl_zscore) %>%
+#   mutate(chromVAR_zscore_dif_mean = ave(chromVAR_zscore_dif, tf, condition, FUN = function (x) mean(x, na.rm = T))) %>%
+#   filter(condition %in% c("mES_CH", "mES_LIF", "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_FBS", "mES_FK", "mES_Heat",
+#                           "mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "mES_TFCP2L1", "mES_FOXA1_OE"))
+
+# # Calculate differential deviation p-values
+# dev_dif_ch <- differentialDeviations(dev[,dev@colData$treatment %in% c("2i_LIF", "CH")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_CH")
+# 
+# dev_dif_lif <- differentialDeviations(dev[,dev@colData$treatment %in% c("2i_LIF", "LIF")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_LIF")
+# 
+# dev_dif_heat <- differentialDeviations(dev[,dev@colData$treatment %in% c("NT", "Heat")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_Heat")%>%
+#   left_join(motifs_selected) 
+# 
+# dev_dif_pou5f1 <- differentialDeviations(dev[,dev@colData$treatment %in% c("POU5F1_ctrl", "POU5F1_DEG")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_POU5F1_DEG")
+# 
+# dev_dif_sox2 <- differentialDeviations(dev[,dev@colData$treatment %in% c("SOX2_ctrl", "SOX2_DEG")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_SOX2_DEG")
+# 
+# dev_dif_fbs <- differentialDeviations(dev[,dev@colData$treatment %in% c("NT", "FBS")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_FBS")
+# 
+# dev_dif_fk <- differentialDeviations(dev[,dev@colData$treatment %in% c("NT", "FK")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_FK")
+# 
+# dev_dif_lif_1h <- differentialDeviations(dev[,dev@colData$treatment %in% c("NT", "LIF_1h")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_LIF_1h")
+# 
+# dev_dif_lif_3h <- differentialDeviations(dev[,dev@colData$treatment %in% c("NT", "LIF_3h")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_LIF_3h")
+# 
+# dev_dif_lif_6h <- differentialDeviations(dev[,dev@colData$treatment %in% c("NT", "LIF_6h")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_LIF_6h")
+# 
+# dev_dif_tfcp2l1 <- differentialDeviations(dev[,dev@colData$treatment %in% c("NT", "TFCP2L1")], group = "treatment") %>%
+#   rownames_to_column(var = "motif_id") %>%
+#   distinct(motif_id, p_value) %>%
+#   mutate(condition = "mES_TFCP2L1")
+# 
+# # dev_dif_foxa1 <- differentialDeviations(dev[,dev@colData$treatment %in% c("FOXA1_ctrl", "FOXA1_OE")], group = "treatment") %>%
+# #   rownames_to_column(var = "motif_id") %>%
+# #   distinct(motif_id, p_value_adjusted) %>%
+# #   mutate(condition = "mES_FOXA1_OE")
+# 
+# dev_dif <- rbind(dev_dif_ch, dev_dif_lif, dev_dif_heat, dev_dif_pou5f1, dev_dif_sox2, dev_dif_fbs, dev_dif_fk,
+#                  dev_dif_lif_1h, dev_dif_lif_3h, dev_dif_lif_6h, dev_dif_tfcp2l1)
+
+
+
+devMat <- assays(dev)$deviations
+
+# Estimate the fold changes and standard errors by fitting a linear model for each gene
+
+condition <- factor(colData(dev)$treatment)
+design <- model.matrix(~ 0 + condition)
+colnames(design) <- make.names(levels(condition))
+
+# Fit model once to all data
+fit <- lmFit(devMat, design)
+
+# List of named contrasts — use clean condition names (no quotes)
+contrast_list <- list(
+  `CH_vs_2i_LIF` = c("CH", "2i_LIF"),
+  `LIF_vs_2i_LIF` = c("LIF", "NT"),
+  `Heat_vs_NT` = c("Heat", "NT"),
+  `POU5F1_DEG_vs_ctrl` = c("POU5F1_DEG", "POU5F1_ctrl"),
+  `SOX2_DEG_vs_ctrl` = c("SOX2_DEG", "SOX2_ctrl"),
+  `FBS_vs_NT` = c("FBS", "NT"),
+  `FK_vs_NT` = c("FK", "NT"),
+  `LIF_1h_vs_NT` = c("LIF_1h", "NT"),
+  `LIF_3h_vs_NT` = c("LIF_3h", "NT"),
+  `LIF_6h_vs_NT` = c("LIF_6h", "NT"),
+  `TFCP2L1_vs_NT` = c("TFCP2L1", "NT"),
+  `FOXA1_OE_vs_ctrl` = c("FOXA1_OE", "FOXA1_ctrl")
+)
+
+# Run contrasts in a loop
+results_list <- list()
+
+results_list[[i]] <- for (i in 1:12) {
+  
+  print(i)
+  
+  groups <- contrast_list[[i]]
+  contrast_names <- make.names(groups)
+
+  # Skip if contrast levels don't exist in design
+  if (!all(contrast_names %in% colnames(design))) {
+    warning(paste("Skipping contrast", name, "— missing levels"))
+    return(NULL)
+  }
+
+  # Create contrast matrix for this comparison
+  contrast_matrix <- makeContrasts(
+    contr = paste0(contrast_names[1], " - ", contrast_names[2]),
+    levels = design
+  )
+
+  # Fit and apply eBayes for this contrast
+  fit_contrast <- contrasts.fit(fit, contrast_matrix)
+  fit_contrast <- eBayes(fit_contrast)
+
+  # Extract table of results
+  top <- topTable(fit_contrast, number = Inf)
+  top$motif_id <- rownames(top)
+  top$group1 <- groups[1]
+  top$group2 <- groups[2]
+
+  results_list[[i]] <- top
+}
+
+# Combine into one dataframe
+combined_top_table <- bind_rows(results_list) %>%
+  left_join(motifs_selected) %>%
+  dplyr::select(tf, "chromVAR_zscore_dif_mean" = logFC, "p_value_adjusted" = adj.P.Val, "condition" = group1) 
+
+
+dev_scores_dif <- dev_scores_dif %>%
+  left_join(dev_dif)
+
+saveRDS(dev_scores_dif, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025_mouse_all.rds")
+```
+
+---
+
+
+
+## Run on individual comparisons instead of all together
+
+```{r out.width= "80%", fig.align= "center"}
+# Import peak count information for ChromVAR
+peak_count <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
+assayNames(peak_count) <- "counts"
+
+# Filter samples
+peak_count <- peak_count[, peak_count@colData$celltype == "mES"] ## Run seperately for each cell type
+peak_count <- peak_count[, peak_count@colData$treatment %in% c("2i_LIF", "FK")] ## Run seperately for each cell type
+peak_count <- peak_count[, !peak_count@colData$basename == "1_mES_r3_TAAGGCGA-AGGCTTAG_S1"] ## Run seperately for each cell type
+
+
+# Add GC bias
+peak_count <- addGCBias(peak_count, genome = BSgenome.Mmusculus.UCSC.mm10)
+
+## Filter peaks - each peak must have at least one count in one condition
+peak_count <- filterPeaks(sort(peak_count), non_overlapping = TRUE)
+
+## Extract metadata
+metadata <- data.frame(peak_count@colData) %>%
+  rownames_to_column("sample") %>%
+  distinct(sample, run, celltype, treatment, replicate)
+
+
+# Import motif information
+seq_logos <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/lambert_2018/seq_logos.rds")
+motifs_selected <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/lambert_2018/motifs_selected.rds") %>%
+  mutate(tf = toupper(tf)) %>%
+  mutate(tf = ifelse(tf == "AHR:ARNT", "AHR::ARNT", tf)) %>%
+  mutate(tf = ifelse(tf == "RAR:RXR", "RARA:RXRA", tf)) %>%
+  rbind(data.frame(tf = c("STAT1", "STAT4", "ATF2", "ATF4", "ATF6", "CLOCK"),
+                   motif_id = c("M06794_1.94d.txt", "M06797_1.94d.txt", "M08481_1.94d.txt", "M08489_1.94d.txt", "M09435_1.94d.txt", "M05596_1.94.txt")))
+  
+seq_logos_pwm <- list()
+for (i in names(seq_logos)) {
+  if (i %in% motifs_selected$motif_id) {
+  seq_logos_pwm[[i]] <- universalmotif::convert_motifs(seq_logos[[i]], class = "TFBSTools-PWMatrix")
+  seq_logos_pwm[[i]]@name <- i
+  seq_logos_pwm[[i]]@strand <- "+-"
+  }
+}
+# 
+# seq_logos_pwm <- list()
+# for (i in names(seq_logos)) {
+#   seq_logos_pwm[[i]] <- universalmotif::convert_motifs(seq_logos[[i]], class = "TFBSTools-PWMatrix")
+#   name_tf <- all_motifs$tf[all_motifs$motif_id == i]
+#   seq_logos_pwm[[i]]@name <- name_tf
+#   seq_logos_pwm[[i]]@strand <- "+-"
+# }
+# 
+
+seq_logos_pwm_all <- do.call(TFBSTools::PWMatrixList, seq_logos_pwm)
+
+motif_ix <- matchMotifs(seq_logos_pwm_all, peak_count, 
+                        genome = BSgenome.Mmusculus.UCSC.mm10)
+```
+
+---
+
+### Run chromVAR
+```{r out.width= "80%", fig.align= "center"}
+# Compute deviations
+bg <- getBackgroundPeaks(object = peak_count, niterations = 2000)
+dev <- computeDeviations(object = peak_count, annotations = motif_ix
+                         ,background_peaks = bg
+                         )
+
+dev_dif <- differentialDeviations(dev, group = "treatment") %>%
+  rownames_to_column(var = "motif_id") %>%
+  left_join(motifs_selected) 
+
+dev_scores <- deviations(dev) %>%
   as.data.frame() %>%
   rownames_to_column(var = "motif_id") %>%
   left_join(motifs_selected) %>%
@@ -253,13 +465,21 @@ dev_scores_ctrl <- dev_scores %>%
   mutate(run = ifelse(ref_condition == "NPC_DMSO", 8010, run)) %>%
   mutate(replicate = as.factor(replicate)) 
 
+dev_scores_ctrl2 <- dev_scores_ctrl %>%
+  filter(ref_condition == "NPC_DMSO") %>%
+  mutate(run = 7822)
+
+dev_scores_ctrl <- rbind(dev_scores_ctrl, dev_scores_ctrl2)
+
+
 condition_match <- data.frame(condition = c("mES_LIF", "mES_PD", "mES_CH", "mES_FOXA1_OE", "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_TFCP2L1", "mES_SP1",
                                             "mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "mES_HQ_1h", "mES_HQ_3h", "mES_HQ_6h", "mES_10PD", "mES_FBS", 
-                                            "mES_FK", "mES_vitC", "mES_Heat", "mES_PMA", "mES_Nutlin", "mES_FK_new", "NPC_HQ", "NPC_cGAMP", "NPC_FK"),
+                                            "mES_FK", "mES_vitC", "mES_Heat", "mES_PMA", "mES_Nutlin", "mES_FK_new", "NPC_HQ", "NPC_cGAMP", "NPC_FK",
+                                            "mES_2i_LIF"),
                               ref_condition = c("mES_2i_LIF", "mES_2i_LIF", "mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT",
                                                 "mES_NT",
                                                 "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT", "mES_NT",
-                                                "mES_NT", "mES_NT", "mES_NT","mES_NT", "mES_NT", "mES_NT", "NPC_DMSO", "NPC_DMSO", "NPC_DMSO"))
+                                                "mES_NT", "mES_NT", "mES_NT","mES_NT", "mES_NT", "mES_NT", "NPC_DMSO", "NPC_DMSO", "NPC_DMSO", "NPC_DMSO"))
 
 dev_scores_dif <- dev_scores %>%
   left_join(condition_match) %>%
@@ -268,14 +488,47 @@ dev_scores_dif <- dev_scores %>%
   mutate(chromVAR_zscore_dif_mean = ave(chromVAR_zscore_dif, tf, condition, FUN = function (x) mean(x, na.rm = T)))
 
 # Compute variability
-variability <- computeVariability(dev)
+variability <- computeVariability(dev) %>%
+  rownames_to_column(var = "motif_id") %>%
+  left_join(motifs_selected) 
 
 plotVariability(variability, use_plotly = FALSE)
 
-saveRDS(dev_scores_dif, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025_mouse_all.rds")
+#saveRDS(dev_scores_dif, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025_mouse_all.rds")
+
+
+devMat <- assays(dev)$z
+
+# Estimate the fold changes and standard errors by fitting a linear model for each gene
+
+condition <- factor(colData(dev)$treatment)
+design <- model.matrix(~ 0 + condition)
+colnames(design) <- levels(condition)
+
+fit <- lmFit(devMat, 
+             design)
+
+# Apply empirical Bayes smoothing to the standard errors
+
+fit <- eBayes(fit)
+
+# Show statistics for the top 10 genes
+
+topTFs <- topTable(fit, number = Inf) %>%
+  rownames_to_column(var = "motif_id") %>%
+  left_join(motifs_selected) 
+  
 ```
 
----
+
+
+
+
+
+
+
+
+
 
 ## ChromVAR on the human conditions
 
