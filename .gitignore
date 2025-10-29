@@ -54,6 +54,8 @@ data/**/results/
 data/**/.snakemake/
 data/**/logs/
 
+archive/
+RNA_seq_analyses/
 ATAC_seq_analyses/data
 ATAC_seq_analyses/bam
 ATAC_seq_analyses/bed_peaks
