@@ -160,14 +160,18 @@ force_zero_axes <- function(p) {
 ```{r out.width= "80%", fig.align= "center"}
 # Import TF reporter activities (only of the identified prime reporters)
 ## Import reporter activities
-cDNA_df <- read.csv("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240724_reporter_activity_filt_combined_complete.csv", header = T) %>%
+cDNA_df <- read.csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240724_reporter_activity_filt_combined_complete.csv", header = T) %>%
   mutate(tf = gsub("_.*", "", tf))
 
 # Load RNA-seq data
 tf_rna <- read_tsv("/DATA/usr/m.trauernicht/data/RNA_seq/rna_tpm_all_tfs.tsv")
 
 ## Import prime reporters
+<<<<<<< HEAD
 prime_reporters <- read_csv("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/best_reporters.csv") %>%
+=======
+prime_reporters <- read_csv("/DATA/shared/projects/TF_REPORTERS/SuRE-TF/data/best_reporters.csv") %>%
+>>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
   mutate(reporter_id = ifelse(tf == "POU5F1::SOX2", "POU5F1::SOX2_5bp_21bp_minP_1", reporter_id)) #%>% ## Update prime reporters
  # mutate(reporter_id = ifelse(tf == "POU5F1", "POU5F1_5bp_21bp_minP_2", reporter_id))#%>%
   #filter(conf_level > 1)
@@ -201,7 +205,7 @@ primetime_activities <- bind_rows(data_list) %>%
 
 
 ## Import primetime-computed activities of all conditions
-base_dir <- "/DATA/usr/m.trauernicht/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT"
+base_dir <- "~/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT"
 sub_dirs <- list.dirs(base_dir, recursive = FALSE)
 file_paths <- file.path(sub_dirs, "primetime_results", "primetime_results.txt")
 file_paths <- file_paths[file.exists(file_paths)]
@@ -243,7 +247,11 @@ prime_activities_comb <- rbind.fill(prime_activities_comb, primetime_activities_
 
 ### Load chromVAR data
 ```{r out.width= "80%", fig.align= "center"}
+<<<<<<< HEAD
 chromvar_scores_mouse_added_all <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
+=======
+chromvar_scores_mouse_added_all <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
+>>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
 ```
 
 ---
@@ -495,7 +503,7 @@ pheatmap(tf_activity_chromVAR_dev_cor,
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 ## Barcode counts SOX2 reporters upon SOX2 degradation
 ## Load data
-primetime_sox2_bc <- read_delim("/DATA/usr/m.trauernicht/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT/mES_SOX2/tmp_primetime/activity/cDNA_counts.txt") %>%
+primetime_sox2_bc <- read_delim("~/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT/mES_SOX2/tmp_primetime/activity/cDNA_counts.txt") %>%
   pivot_longer(cols = c(-tf, -negative_control, -promoter, -barcode),
                names_to = "sample",
                values_to = "reads") %>%
@@ -503,7 +511,7 @@ primetime_sox2_bc <- read_delim("/DATA/usr/m.trauernicht/projects/prime_TF_repor
   filter(tf == "SOX2") %>%
   mutate(condition = gsub("_[1-3]{1}", "", sample))
 
-primetime_pDNA <- read_delim("/DATA/usr/m.trauernicht/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT/mES_SOX2/tmp_primetime/activity/pDNA_counts.txt") %>%
+primetime_pDNA <- read_delim("~/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT/mES_SOX2/tmp_primetime/activity/pDNA_counts.txt") %>%
     mutate(pDNA_rpm = pDNA / sum(pDNA) *1e6 )
   
 primetime_sox2_bc <- primetime_sox2_bc %>%
@@ -941,7 +949,7 @@ pheatmap(target_ranks_matrix,
 ## Compare chromVAR computed using our data with data from de Wit's lab
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 # Load chromVAR activities computed from de Wit's data
-chromvar_scores_teun <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_teun.rds") %>%
+chromvar_scores_teun <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_teun.rds") %>%
   distinct(tf, "chromVAR_zscore_dif_mean" = dif_chromVAR_zscore, condition) %>%
   mutate(source = "teun")
 
@@ -972,7 +980,7 @@ ggplot(chromvar_scores_mouse_comp %>%
 ## Compare chromVAR with logOR of motif accessibility
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 # Import motif abundance in differential ATAC-seq peaks - computed by Teun on their data
-motif_statistics <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/analyses/ATAC_degron/motif_statistics_bos_sox2_only.rds") %>%
+motif_statistics <- readRDS("~/projects/SuRE-TF/analyses/ATAC_degron/motif_statistics_bos_sox2_only.rds") %>%
   filter(time == "24H") %>%
   mutate(motif_name = toupper(motif_name)) %>%
   mutate(motif_name = ifelse(motif_name == "NR1H2::RXRA", "NR1H2", motif_name)) %>%
@@ -1006,7 +1014,7 @@ ggplot(motif_statistics,
 ## Compare TF activity to RNA-seq change (DESeq2)
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 # Load DESeq2 results
-tf_deseq <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/deseq_changed_LIF.rds") %>%
+tf_deseq <- readRDS("~/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/deseq_changed_LIF.rds") %>%
   mutate(tf = ifelse(tf == "ARNT", "AHR::ARNT", tf)) %>%
   mutate(tf = ifelse(tf == "FOS", "FOS::JUN", tf)) %>%
   mutate(tf = ifelse(tf == "NFE2", "MAF::NFE2", tf)) %>%
@@ -1050,7 +1058,7 @@ ggplot(prime_activities_deseq,
 ## Compare reporter activity to VIPER-inferred TF activity
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 # Load VIPER results
-viper_activities <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/tf_activities_viper.rds")  %>%
+viper_activities <- readRDS("~/rojects/ATAC_TF_reporter_comparison/RNA_seq_analyses/tf_activities_viper.rds")  %>%
   mutate(tf = ifelse(tf == "ARNT", "AHR::ARNT", tf)) %>%
   mutate(tf = ifelse(tf == "FOS", "FOS::JUN", tf)) %>%
   mutate(tf = ifelse(tf == "NFE2", "MAF::NFE2", tf)) %>%
@@ -1113,7 +1121,7 @@ ggplot(prime_activities_viper,
 ## Compare reporter activity to ISMARA-inferred TF activity
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 # Load VIPER results
-ismara_activities <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/ismara_activities.rds")  %>%
+ismara_activities <- readRDS("~/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/ismara_activities.rds")  %>%
   mutate(tf = ifelse(tf == "ARNT", "AHR::ARNT", tf)) %>%
   mutate(tf = ifelse(tf == "FOS", "FOS::JUN", tf)) %>%
   mutate(tf = ifelse(tf == "NFE2", "MAF::NFE2", tf)) %>%

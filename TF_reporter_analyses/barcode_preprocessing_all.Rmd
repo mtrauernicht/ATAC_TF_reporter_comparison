@@ -174,8 +174,13 @@ hline <- function(y = 0, color = "black") {
 
 ```{r data import, out.width= "80%", fig.align= "center",  warning= FALSE, message=FALSE}
 # Load metadata file that contains all required information about the sequenced samples
+<<<<<<< HEAD
 metadata_df <- read_csv2("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240719_metadata_all.csv")
 metadata_df_pDNA_old <- read_csv2("/DATA/shared/projects/TF_REPORTERS/SuRE-TF/data/mt20240528_metadata_all.csv") %>%
+=======
+metadata_df <- read_csv2("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240719_metadata_all.csv")
+metadata_df_pDNA_old <- read_csv2("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/mt20240528_metadata_all.csv") %>%
+>>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
   filter(file == "7027_73_pDNA_E2035_CCGCGGTT-TCTGTTGG_S73_barcode_counts.tsv") 
 metadata_df <- rbind(metadata_df, metadata_df_pDNA_old)
 metadata_df$path <- gsub("/DATA/usr/m.trauernicht/projects", "/DATA/shared/projects/TF_REPORTERS", metadata_df$path)
