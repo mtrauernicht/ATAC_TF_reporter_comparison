@@ -46,25 +46,26 @@ library(ggplot2)
 library(scales)
 library(ggh4x)
 library(patchwork)
-library(ggchromatic)
+#library(ggchromatic)
 library(ggforce)
-library(gganimate)
+#(gganimate)
 library(readr)
 
 library(DESeq2)
 library(SummarizedExperiment)
-library(seriation)
-library(ChIPseeker)
-library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+#library(seriation)
+#library(ChIPseeker)
+#library(TxDb.Hsapiens.UCSC.hg38.knownGene)
 ```
 
 ### Load data
 
 ```{r load_data}
 
-setwd("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses")
+setwd("~/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses")
 
-exp <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20241003.rds")
+exp <- readRDS("~/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
+exp$replicate[exp$celltype == "mES" & exp$treatment == "2i_LIF" & exp$replicate == "R3" & exp$run == "8011"] <- "R4"
 ```
 
 ### Setup Aesthetics
@@ -246,7 +247,10 @@ df <- data.frame(
   sizefactor = sizeFactors(exp)
 )
 
-write_csv(df, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/size_factors_deseq.csv")
+df <- df %>%
+  filter(!(treatment == "2i_LIF" & replicate == "R3"))
+
+write_csv(df, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/size_factors_deseq_mt20250423.csv")
 
 fit <- MASS::rlm(sizefactor ~ 0 + rip, data = df)
 

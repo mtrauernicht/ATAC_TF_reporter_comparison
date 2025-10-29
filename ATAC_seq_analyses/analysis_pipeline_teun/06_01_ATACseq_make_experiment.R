@@ -10,10 +10,10 @@ library(data.table)
 
 meta <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES.rds")
 
-peaks_7784 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/7784_peaks.narrowPeak")
-peaks_7822 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/7822_peaks.narrowPeak")
-peaks_8010 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/8010_peaks.narrowPeak")
-peaks_8011 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/8011_peaks.narrowPeak")
+peaks_7784 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/7784_peaks_fixed.bed")
+peaks_7822 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/7822_peaks_fixed.bed")
+peaks_8010 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/8010_peaks_fixed.bed")
+peaks_8011 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/8011_peaks_fixed.bed")
 peaks <- c(peaks_7784, peaks_7822, peaks_8010, peaks_8011)
 peaks <- as(peaks, "GNCList")
 
