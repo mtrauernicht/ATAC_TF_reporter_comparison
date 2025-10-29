@@ -18,7 +18,6 @@ This repository contains the analysis and code for comparing transcription facto
   - RNA-seq data
 - **`/ATAC_seq_analyses/`**: Contains all analysis pipelines to analyze the raw ATAC-seq data.
 - **`/TF_reporter_analyses/`**: Contains computation of TF activity from TF reporter assays + computation of TF activity from ATAC-seq & RNA-seq and their comparison.
-- **`/docs/`**: Documentation files explaining the methodology, findings, and supplementary information.
 
 
 ## Contact
