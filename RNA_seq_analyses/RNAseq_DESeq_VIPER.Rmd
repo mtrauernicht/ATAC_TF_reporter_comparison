@@ -58,21 +58,21 @@ library(ggplot2)
 library(ggbeeswarm)
 library(DESeq2)
 library(RColorBrewer)
-library(GGally)
-library(ggpubr)
-library(biomaRt)
+#library(GGally)
+#library(ggpubr)
+#library(biomaRt)
 #library(clusterProfiler)
 #library(pathview)
-library(enrichplot)
-library(DOSE)
+#library(enrichplot)
+#library(DOSE)
 library(ggnewscale)
-library(ggridges)
-library(europepmc)
+#library(ggridges)
+#library(europepmc)
 library(scales)
-library(GENOVA)
+#library(GENOVA)
 library(ggh4x)
 library(SummarizedExperiment)
-library(seriation)
+#library(seriation)
 library(dorothea)
 library(decoupleR)
 ```
@@ -205,7 +205,7 @@ tf_activities_viper <- tf_activities %>%
   rownames_to_column("tf") %>%
   pivot_longer(-tf, names_to = "sample", values_to = "viper_activity")
   
-saveRDS(tf_activities_viper, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/tf_activities_viper.rds")
+saveRDS(tf_activities_viper, "~/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/tf_activities_viper.rds")
 
 
 ## Check why some TFs go up (e.g. HNF1A)
@@ -237,7 +237,7 @@ ggplot(gene_count_mat_ex,
 metadata_df <- gene_counts %>%
   distinct(sample, condition, replicate)
 
-ismara_activities <- read_delim("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/activity_table") %>%
+ismara_activities <- read_delim("~/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/activity_table") %>%
   dplyr::rename("sample" = "#sample") %>%
   pivot_longer(-sample, names_to = "tf", values_to = "ismara_activity") %>%
   mutate(tf = toupper(tf)) %>%
@@ -256,7 +256,7 @@ ismara_activities <- ismara_activities %>%
   mutate(mean_ismara_activity_dif = ave(ismara_activity_dif, tf, FUN = mean))
 
 
-saveRDS(ismara_activities, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/ismara_activities.rds")
+saveRDS(ismara_activities, "~/ATAC_TF_reporter_comparison/RNA_seq_analyses/ismara_activities.rds")
 ```
 
 
@@ -447,7 +447,7 @@ ggplot(,mapping = aes(x = lfc, y = -log10(p_value))) +
   labs(x = "log2 fold change", y = "-log10 p-value", color = "STAT3 target gene") +
   labs_pubr()
 
-saveRDS(df_changed_LIF, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/deseq_changed_LIF.rds")
+saveRDS(df_changed_LIF, "~/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/deseq_changed_LIF.rds")
 ```
 
 ---
