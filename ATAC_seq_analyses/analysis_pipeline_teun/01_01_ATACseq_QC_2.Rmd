@@ -58,8 +58,8 @@ library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 ### Load data
 
 ```{r load_data}
-setwd("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses")
-exp <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
+setwd("~/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses")
+exp <- readRDS("~/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
 ```
 
 ### Setup Aesthetics

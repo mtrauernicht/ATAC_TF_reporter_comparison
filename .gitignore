@@ -54,6 +54,7 @@ data/**/results/
 data/**/.snakemake/
 data/**/logs/
 
+
 archive/
 RNA_seq_analyses/
 ATAC_seq_analyses/data
