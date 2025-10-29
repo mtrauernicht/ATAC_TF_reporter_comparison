@@ -309,11 +309,8 @@ dev_scores_dif <- dev_scores_dif %>%
   dplyr::select(-chromVAR_zscore_dif_mean) %>%
   left_join(combined_top_table)
 
-<<<<<<< HEAD
+
 saveRDS(dev_scores_dif, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
-=======
-saveRDS(dev_scores_dif, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
->>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
 ```
 
 ---
@@ -433,11 +430,8 @@ dev_scores_dif_filt2 <- dev_scores_dif_filt %>%
 
 ```{r out.width= "80%", fig.align= "center"}
 # Import peak count information for ChromVAR
-<<<<<<< HEAD
 peak_count <- readRDS("~/projects/SuRE-TF/analyses/ATAC_degron/timeseries_SummarizedExperiment.rds")
-=======
-peak_count <- readRDS("/DATA/usr/m.trauernicht/projects/SuRE-TF/analyses/ATAC_degron/timeseries_SummarizedExperiment.rds")
->>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
+
 assayNames(peak_count) <- "counts"
 
 # Add GC bias
@@ -495,11 +489,7 @@ dev_scores_dif <- dev_scores %>%
   na.omit()
 
 
-<<<<<<< HEAD
 saveRDS(dev_scores_dif, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_teun.rds")
-=======
-saveRDS(dev_scores_dif, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_teun.rds")
->>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
 ```
 
 

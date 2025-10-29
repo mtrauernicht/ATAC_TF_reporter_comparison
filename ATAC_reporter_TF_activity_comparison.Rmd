@@ -167,11 +167,7 @@ cDNA_df <- read.csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_compari
 tf_rna <- read_tsv("/DATA/usr/m.trauernicht/data/RNA_seq/rna_tpm_all_tfs.tsv")
 
 ## Import prime reporters
-<<<<<<< HEAD
-prime_reporters <- read_csv("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/best_reporters.csv") %>%
-=======
 prime_reporters <- read_csv("/DATA/shared/projects/TF_REPORTERS/SuRE-TF/data/best_reporters.csv") %>%
->>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
   mutate(reporter_id = ifelse(tf == "POU5F1::SOX2", "POU5F1::SOX2_5bp_21bp_minP_1", reporter_id)) #%>% ## Update prime reporters
  # mutate(reporter_id = ifelse(tf == "POU5F1", "POU5F1_5bp_21bp_minP_2", reporter_id))#%>%
   #filter(conf_level > 1)
@@ -247,11 +243,7 @@ prime_activities_comb <- rbind.fill(prime_activities_comb, primetime_activities_
 
 ### Load chromVAR data
 ```{r out.width= "80%", fig.align= "center"}
-<<<<<<< HEAD
-chromvar_scores_mouse_added_all <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
-=======
 chromvar_scores_mouse_added_all <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
->>>>>>> 59b729a9acd9c5bd218ef756ba935b9811d91d57
 ```
 
 ---
