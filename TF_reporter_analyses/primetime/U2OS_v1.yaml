@@ -1,0 +1,61 @@
+################################################################################
+# Primetime: TF reporter pipeline
+# Vinícius H. Franceschini-Santos, Max Trauernicht 
+# =============================================================================
+# ============================ Config file  ===================================
+# =============================================================================
+
+#==============================================================================
+INPUT_DATA:
+  U2OS_v1:
+    is_pdna: False
+    condition: DMSO
+    fastq:
+      - /shared/gcf/h.yucel/8025/M1115_fastq_files/8025_1_pMT52-5_R1_UT_AACATCGCGC-ACAAGTGGAC_S1_R1_001.fastq.gz
+      - /shared/gcf/h.yucel/8025/M1115_fastq_files/8025_5_pMT52-5_R2_UT_AGTCAGACGA-TGTCGCTGGT_S5_R1_001.fastq.gz
+
+  U2OS_v1_calcitriol:
+    is_pdna: False
+    condition: Calcitriol
+    fastq:
+      - /shared/gcf/h.yucel/8025/M1115_fastq_files/8025_2_pMT52-5_R1_calcitriol_CTAGTGCTCT-TACTGTTCCA_S2_R1_001.fastq.gz
+      - /shared/gcf/h.yucel/8025/M1115_fastq_files/8025_6_pMT52-5_R2_calcitriol_CCGTATGTTC-ACAGTGTATG_S6_R1_001.fastq.gz
+
+  pDNA:
+    is_pdna: True
+    condition: None
+    fastq: 
+      - /shared/gcf/h.yucel/7866/M1079_fastq_files/7866_pDNA_pMT52-5_GTGACACGCA-TCCGACCTCG_S29_R1_001.fastq.gz
+# ==============================================================================
+COMPARATIVE_ANALYSIS:
+  REFERENCE_CONDITION: DMSO
+  CONTRAST_CONDITION: Calcitriol
+
+# =============================================================================
+OUTPUT_DIRECTORY: 01_OUTPUT/U2OS_DMSO_Calc_v1
+
+
+# ==============================================================================
+# ============================ Pipeline parameters =============================
+PVALUE_THRESHOLD: 0.01
+
+
+# ==============================================================================
+# ============================ Library parameters ==============================
+# Number of barcodes per TF
+BARCODES_PER_TF: 5
+
+# Length of the barcodes
+BARCODE_LENGTH: 12
+
+# BC downstream sequence: this will be used to identify the barcodes in the fastq files
+BARCODE_DOWNSTREAM_SEQUENCE: CATCGTCGCATCCAAGAGGCTAGCTAACTA 
+
+# How many mismatches are allowed in the downstream sequence to identify the barcode?
+MAX_MISMATCH_DOWNSTREAM_SEQ: 3
+
+# Path to the barcode annotation file
+BARCODE_ANNOTATION_FILE: misc/bc_annotation_prime.csv
+
+# Path to expected pDNA counts, to compare with as a QC
+EXPECTED_PDNA_COUNTS: misc/expected_pDNA_counts.txt
