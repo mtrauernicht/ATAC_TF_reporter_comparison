@@ -1,0 +1,64 @@
+################################################################################
+# Primetime: TF reporter pipeline
+# Vinícius H. Franceschini-Santos, Max Trauernicht 
+# =============================================================================
+# ============================ Config file  ===================================
+# =============================================================================
+
+#==============================================================================
+INPUT_DATA:
+  mESC:
+    is_pdna: False
+    condition: DMSO
+    fastq:
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_29_mES_POU5F1_ctrl_r1_GCTTGTCA-TACTCATA_S29_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_12_mES_2i_LIF_r2_AAGTCCAA-TCGATATC_S12_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7824/NXT447_fastq_files/7824_12_mES_2i_LIF_r1_AAGTCCAA-TCGATATC_S12_R1_001.fastq.gz
+      
+
+  mESC_LIF24:
+    is_pdna: False
+    condition: LIF24
+    fastq:
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_26_mES_LIF_CH_r1_GGACTTGG-TACTCATA_S26_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_9_mES_2i_r2_CCGCGGTT-TCGATATC_S9_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7824/NXT447_fastq_files/7824_9_mES_2i_r1_CCGCGGTT-TCGATATC_S9_R1_001.fastq.gz
+
+  pDNA:
+    is_pdna: True
+    condition: None
+    fastq: 
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_34_pDNA_E2569_CCGCGGTT-TATCGCAC_S34_R1_001.fastq.gz
+# ==============================================================================
+COMPARATIVE_ANALYSIS:
+  REFERENCE_CONDITION: DMSO
+  CONTRAST_CONDITION: LIF24
+
+# =============================================================================
+OUTPUT_DIRECTORY: 01_OUTPUT/mES_LIF24_complete
+
+
+# ==============================================================================
+# ============================ Pipeline parameters =============================
+PVALUE_THRESHOLD: 0.01
+
+
+# ==============================================================================
+# ============================ Library parameters ==============================
+# Number of barcodes per TF
+BARCODES_PER_TF: 5
+
+# Length of the barcodes
+BARCODE_LENGTH: 12
+
+# BC downstream sequence: this will be used to identify the barcodes in the fastq files
+BARCODE_DOWNSTREAM_SEQUENCE: CATCGTCGCATCCAAGAGGCTAGC 
+
+# How many mismatches are allowed in the downstream sequence to identify the barcode?
+MAX_MISMATCH_DOWNSTREAM_SEQ: 3
+
+# Path to the barcode annotation file
+BARCODE_ANNOTATION_FILE: misc/bc_annotation_prime.csv
+
+# Path to expected pDNA counts, to compare with as a QC
+EXPECTED_PDNA_COUNTS: misc/expected_pDNA_counts.txt
