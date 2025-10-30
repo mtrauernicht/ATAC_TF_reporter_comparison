@@ -1,0 +1,237 @@
+---
+title: "TF reporter activity - Combine into one table"
+author: 
+  - name: "Max Trauernicht"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute"
+date: '20/02/2025'
+output: 
+  html_document:
+    theme: flatly  # Modern, professional look
+    highlight: tango  # Clean code highlighting
+    fig_caption: true
+    code_folding: show  # Users can expand/collapse code
+    df_print: paged  # Paginate long tables instead of cluttering the page
+    toc: true
+    toc_depth: 2  # Limits TOC depth for clarity
+    toc_float: 
+      collapsed: true  # Keeps TOC clean, expandable when needed
+      smooth_scroll: true  # Smooth scrolling when clicking TOC links
+    number_sections: true  # Automatically number sections
+    mathjax: "default"  # Enables LaTeX-style equations if needed
+---
+
+---
+
+### Aim
+Comparing activities between ATAC-seq inferred TF activities and activities measured using my optimized prime TF reporters.
+
+---
+
+## Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+    $(document).ready(function() {
+      $items = $('div#TOC li');
+      $items.each(function(idx) {
+        num_ul = $(this).parentsUntil('#TOC').length;
+        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+      });
+
+    });
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+  overflow-x: hidden;
+}
+```
+
+### Libraries 
+
+```{r setup, out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(RColorBrewer)
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(pheatmap)
+library(visNetwork)
+library(ggbeeswarm)
+library(ggforce)
+library(viridis)
+library(purrr)
+library(plyr)
+library(igraph)
+library(ggraph)
+library(cowplot)
+library(gridExtra)
+library(pROC)
+library(tidyr)
+library(stringr)
+library(ggrastr)
+library(readr)
+library(ggbiplot)
+library(ggh4x)
+library(ggiraph)
+library(plotly)
+library(AMR)
+library(umap)
+library(ggrepel)
+library(chromVAR)
+library(Matrix)
+library(SummarizedExperiment)
+library(BiocParallel)
+library(BSgenome.Mmusculus.UCSC.mm10)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(ggnewscale)
+```
+
+### Functions
+
+```{r out.width= "80%", fig.align= "center"}
+### Custom functions
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+
+
+# Extract p-value from linear model
+lmp <- function (modelobject) {
+    if (class(modelobject) != "lm") stop("Not an object of class 'lm' ")
+    f <- summary(modelobject)$fstatistic
+    p <- pf(f[1],f[2],f[3],lower.tail=F)
+    attributes(p) <- NULL
+    return(p)
+}
+
+theme_custom <- theme(
+  text = element_text(size = 12),
+  
+  # Remove panel background
+  panel.background = element_blank(),
+  
+  # Customize grid lines: Keep both major X and Y grid lines, make them thinner
+  panel.grid = element_blank(),
+  panel.grid.major = element_line(colour = "#e3e1e1", linetype = 1, size = 0.3),
+  
+  # Ensure axis lines and ticks are visible
+  axis.line = element_line(colour = "black"),
+  axis.ticks = element_line(colour = "black"),
+  
+  # Make axis ticks longer
+  axis.ticks.length = unit(7, "pt"),  # Adjust the length as needed
+  
+  # Add an outside border to the plotting area
+  panel.border = element_rect(colour = "black", fill = NA, size = .5),
+  
+  # Ensure facet (strip) outline matches the panel border thickness
+  strip.background = element_rect(fill = "grey90", colour = "black", size = .5),
+  strip.text = element_text(face = "bold"),
+  
+  # Adjust plot layout
+  plot.title.position = "plot",
+  legend.position = "top",
+  legend.title = element_blank()
+)
+
+theme_set(theme_minimal() + theme_custom)
+
+# Function to force axes to start at zero
+force_zero_axes <- function(p) {
+  p + 
+    scale_x_continuous(expand = c(0, 0), limits = c(0, NA)) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, NA))
+}
+```
+
+### Loading reporter activities
+
+```{r out.width= "80%", fig.align= "center"}
+# Import TF reporter activities (only of the identified prime reporters)
+## Import reporter activities
+cDNA_df <- read.csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240724_reporter_activity_filt_combined_complete.csv", header = T) %>%
+  mutate(tf = gsub("_.*", "", tf))
+
+# Load RNA-seq data
+tf_rna <- read_tsv("/DATA/usr/m.trauernicht/data/RNA_seq/rna_tpm_all_tfs.tsv")
+
+## Import prime reporters
+prime_reporters <- read_csv("/DATA/shared/projects/TF_REPORTERS/SuRE-TF/data/best_reporters.csv") %>%
+  mutate(reporter_id = ifelse(tf == "POU5F1::SOX2", "POU5F1::SOX2_5bp_21bp_minP_1", reporter_id)) #%>% ## Update prime reporters
+ # mutate(reporter_id = ifelse(tf == "POU5F1", "POU5F1_5bp_21bp_minP_2", reporter_id))#%>%
+  #filter(conf_level > 1)
+
+prime_activities <- cDNA_df %>%
+  filter(reporter_id %in% prime_reporters$reporter_id,
+         !sample_id %in% c("mES_POU5F1_DEG_r3_gcf7785", "mES_SOX2_DEG_r3_gcf7785")) %>%
+  distinct(tf, condition, reporter_activity_dif_sample, replicate, reporter_activity_minP, "ctrl_activity" = reference_activity_minP) %>%
+  mutate(reporter_activity_dif_sample = ave(reporter_activity_dif_sample, tf, condition, replicate, FUN = function(x) mean(x, na.rm = T))) %>%
+  mutate(reporter_activity_minP = ave(reporter_activity_minP, tf, condition, replicate, FUN = function(x) mean(x, na.rm = T))) %>%
+  distinct() %>%
+  mutate(replicate = toupper(replicate)) %>%
+  filter(condition %in% c("mES_SOX2_DEG", "mES_POU5F1_DEG", "mES_FOXA1_OE", "mES_PD", "mES_CH", "mES_LIF", "U2OS_PMA", "U2OS_Heat", "U2OS_Calcitriol", "MCF7_Hexestrol", "mES_2i_LIF"))
+
+
+## Import primetime-computed activities of all conditions
+base_dir <- "~/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT"
+sub_dirs <- list.dirs(base_dir, recursive = FALSE)
+file_paths <- file.path(sub_dirs, "primetime_results", "primetime_results.txt")
+file_paths <- file_paths[file.exists(file_paths)]
+read_and_process <- function(file) {
+  data <- read_delim(file) %>%
+    select(logFC, tf, p_adjusted, sig, "ctrl_activity" = DMSO) %>%  # Keep only selected columns
+    mutate(condition = basename(dirname(dirname(file))))  # Extract unique subdirectory name
+  return(data)
+}
+data_list <- map(file_paths, read_and_process)
+primetime_activities_all <- bind_rows(data_list) %>%
+  filter(str_detect(tf, "RANDOM", negate = T))
+
+primetime_activities_all_1 <- primetime_activities_all %>%
+  filter(condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
+  mutate(condition = ifelse(condition == "mES_LIF24", "mES_LIF", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_SOX2", "mES_SOX2_DEG", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_POU5F1", "mES_POU5F1_DEG", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_FOXA1", "mES_FOXA1_OE", condition)) %>%
+  dplyr::select(-logFC, -ctrl_activity)
+
+primetime_activities_all_2 <- primetime_activities_all %>%
+  filter(!condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
+  distinct(tf, condition, logFC, p_adjusted, sig, ctrl_activity)
+
+
+prime_activities_comb <- prime_activities %>%
+  filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG", "mES_SOX2_DEG")) %>%
+  dplyr::select(tf, condition, "logFC" = reporter_activity_dif_sample, replicate, ctrl_activity) %>%
+  left_join(primetime_activities_all_1)
+
+prime_activities_comb <- rbind.fill(prime_activities_comb, primetime_activities_all_2) %>%
+  filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG",
+                          "mES_SOX2_DEG", "mES_FBS", "mES_FK", "mES_Heat", "mES_LIF1",
+                          "mES_LIF3", "mES_LIF6", "mES_TFCP2L1", "mES_NPC"))
+
+
+write_csv(prime_activities_comb, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20250220_prime_reporter_activities_combined.csv")
+```
+
+
+
+# Session Info
+```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+

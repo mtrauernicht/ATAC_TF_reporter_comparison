@@ -3,7 +3,7 @@ title: "Comparison of ATAC-seq inferred activity with TF reporter activity"
 author: 
   - name: "Max Trauernicht"
     email: "m.trauernicht@nki.nl"
-    affiliation: "Netherlands Cancer Institute / University of Twente"
+    affiliation: "Netherlands Cancer Institute"
 date: '20/02/2025'
 output: 
   html_document:
@@ -22,33 +22,17 @@ output:
 ---
 
 ---
+ 
+# Aim
+Comparing activities between ATAC-seq inferred TF activities and activities measured using optimized prime TF reporters.
 
-### Aim
-Comparing activities between ATAC-seq inferred TF activities and activities measured using my optimized prime TF reporters.
+---
+ 
+# Setup
 
 ---
 
-## Setup {.tabset}
-
-<!-- little HTML script to do indentation of the table of contents -->
-<script>
-    $(document).ready(function() {
-      $items = $('div#TOC li');
-      $items.each(function(idx) {
-        num_ul = $(this).parentsUntil('#TOC').length;
-        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
-      });
-
-    });
-</script>
-
-```{css, echo = FALSE}
-div.sourceCode {
-  overflow-x: hidden;
-}
-```
-
-### Libraries 
+## Libraries 
 
 ```{r setup, out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -93,7 +77,9 @@ library(BSgenome.Hsapiens.UCSC.hg38)
 library(ggnewscale)
 ```
 
-### Functions
+---
+
+## Functions
 
 ```{r out.width= "80%", fig.align= "center"}
 ### Custom functions
@@ -155,96 +141,18 @@ force_zero_axes <- function(p) {
 }
 ```
 
-### Loading reporter activities
+---
 
+## Load pre-computed TF reporter and chromVAR data
 ```{r out.width= "80%", fig.align= "center"}
-# Import TF reporter activities (only of the identified prime reporters)
-## Import reporter activities
-cDNA_df <- read.csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240724_reporter_activity_filt_combined_complete.csv", header = T) %>%
-  mutate(tf = gsub("_.*", "", tf))
+prime_activities_comb <- read_csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20250220_prime_reporter_activities_combined.csv")
 
-# Load RNA-seq data
-tf_rna <- read_tsv("/DATA/usr/m.trauernicht/data/RNA_seq/rna_tpm_all_tfs.tsv")
-
-## Import prime reporters
-prime_reporters <- read_csv("/DATA/shared/projects/TF_REPORTERS/SuRE-TF/data/best_reporters.csv") %>%
-  mutate(reporter_id = ifelse(tf == "POU5F1::SOX2", "POU5F1::SOX2_5bp_21bp_minP_1", reporter_id)) #%>% ## Update prime reporters
- # mutate(reporter_id = ifelse(tf == "POU5F1", "POU5F1_5bp_21bp_minP_2", reporter_id))#%>%
-  #filter(conf_level > 1)
-
-prime_activities <- cDNA_df %>%
-  filter(reporter_id %in% prime_reporters$reporter_id,
-         !sample_id %in% c("mES_POU5F1_DEG_r3_gcf7785", "mES_SOX2_DEG_r3_gcf7785")) %>%
-  distinct(tf, condition, reporter_activity_dif_sample, replicate, reporter_activity_minP, "ctrl_activity" = reference_activity_minP) %>%
-  mutate(reporter_activity_dif_sample = ave(reporter_activity_dif_sample, tf, condition, replicate, FUN = function(x) mean(x, na.rm = T))) %>%
-  mutate(reporter_activity_minP = ave(reporter_activity_minP, tf, condition, replicate, FUN = function(x) mean(x, na.rm = T))) %>%
-  distinct() %>%
-  mutate(replicate = toupper(replicate)) %>%
-  filter(condition %in% c("mES_SOX2_DEG", "mES_POU5F1_DEG", "mES_FOXA1_OE", "mES_PD", "mES_CH", "mES_LIF", "U2OS_PMA", "U2OS_Heat", "U2OS_Calcitriol", "MCF7_Hexestrol", "mES_2i_LIF"))
-
-## Import primetime-computed activities of added conditions
-base_dir <- "/DATA/usr/v.franceschini/Workspaces/2025_01_13_MAX_CONDITIONS_PRIMETIME/01_OUTPUT"
-sub_dirs <- list.dirs(base_dir, recursive = FALSE)
-file_paths <- file.path(sub_dirs, "MPRAnalyze", "MPRAnalyze_results.txt")
-file_paths <- file_paths[file.exists(file_paths)]
-read_and_process <- function(file) {
-  data <- read_delim(file) %>%
-    select(logFC, tf, p_adjusted, sig) %>%  # Keep only selected columns
-    mutate(condition = basename(dirname(dirname(file))))  # Extract unique subdirectory name
-  return(data)
-}
-data_list <- map(file_paths, read_and_process)
-primetime_activities <- bind_rows(data_list) %>%
-  mutate(condition = gsub("_DMOS", "", condition)) %>%
-  mutate(condition = gsub("_DMSO", "", condition)) %>%
-  filter(!condition %in% c("ITO60_T_vs_H", "U2OS_DMSO_Calc_v1", "U2OS_DMSO_Calc_v1_5", "U2OS_DMSO_Calc_v2", "U2OS_DMSO_Calc_v2_5"))
-
-
-## Import primetime-computed activities of all conditions
-base_dir <- "~/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT"
-sub_dirs <- list.dirs(base_dir, recursive = FALSE)
-file_paths <- file.path(sub_dirs, "primetime_results", "primetime_results.txt")
-file_paths <- file_paths[file.exists(file_paths)]
-read_and_process <- function(file) {
-  data <- read_delim(file) %>%
-    select(logFC, tf, p_adjusted, sig, "ctrl_activity" = DMSO) %>%  # Keep only selected columns
-    mutate(condition = basename(dirname(dirname(file))))  # Extract unique subdirectory name
-  return(data)
-}
-data_list <- map(file_paths, read_and_process)
-primetime_activities_all <- bind_rows(data_list) %>%
-  filter(str_detect(tf, "RANDOM", negate = T))
-
-primetime_activities_all_1 <- primetime_activities_all %>%
-  filter(condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
-  mutate(condition = ifelse(condition == "mES_LIF24", "mES_LIF", condition)) %>%
-  mutate(condition = ifelse(condition == "mES_SOX2", "mES_SOX2_DEG", condition)) %>%
-  mutate(condition = ifelse(condition == "mES_POU5F1", "mES_POU5F1_DEG", condition)) %>%
-  mutate(condition = ifelse(condition == "mES_FOXA1", "mES_FOXA1_OE", condition)) %>%
-  dplyr::select(-logFC, -ctrl_activity)
-
-primetime_activities_all_2 <- primetime_activities_all %>%
-  filter(!condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
-  distinct(tf, condition, logFC, p_adjusted, sig, ctrl_activity)
-
-
-prime_activities_comb <- prime_activities %>%
-  filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG", "mES_SOX2_DEG")) %>%
-  dplyr::select(tf, condition, "logFC" = reporter_activity_dif_sample, replicate, ctrl_activity) %>%
-  left_join(primetime_activities_all_1)
-
-prime_activities_comb <- rbind.fill(prime_activities_comb, primetime_activities_all_2) %>%
-  filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG",
-                          "mES_SOX2_DEG", "mES_FBS", "mES_FK", "mES_Heat", "mES_LIF1",
-                          "mES_LIF3", "mES_LIF6", "mES_TFCP2L1", "mES_NPC"))
+chromvar_scores_mouse_added_all <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
 ```
 
 ---
 
-### Load chromVAR data
-```{r out.width= "80%", fig.align= "center"}
-chromvar_scores_mouse_added_all <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
-```
+# Data visualization
 
 ---
 
@@ -339,6 +247,7 @@ ggplot() +
   geom_point(data = chromvar_scores_mouse_added_sox2, aes(x = type, y = zscore),  width = .1, size = 3, shape = 21, fill = "grey") +
   theme(aspect.ratio = 2.5)
 ```
+Conclusion: Oct4::Sox2 and Sox2 go down, which is a good quality check!
 ---
 
 ## Correlate conditions
@@ -372,6 +281,7 @@ ggplot(chromvar_scores_mouse_comb, aes(x = chromVAR_1, y = chromVAR_2)) +
   geom_abline(intercept = 0, slope = 1, color = "red") +
   theme(aspect.ratio = 1)
 ```
+Conclusion: ChromVar replicates do correlate.
 
 ---
 
@@ -404,6 +314,7 @@ ggplot(chromvar_scores_mouse_added_all %>%
   ylab("TF reporter activity (log2)") +
   theme(aspect.ratio = 1) 
 ```
+Conclusion: Not much correlation on steady-state level. We should probably look at the fold-changes.
 
 ---
 
@@ -439,6 +350,7 @@ ggplot(tf_activity_chromVAR_dev_2 %>% filter(condition == "mES_SOX2_DEG"), aes(x
   theme(aspect.ratio = 1)
 
 ```
+Conclusion: Reporter activity fold-changes do correlate quite well!
 
 ---
 
@@ -488,6 +400,7 @@ pheatmap(tf_activity_chromVAR_dev_cor,
          cellheight = 10)
 
 ```
+Conclusion: chromVAR fold-changes correlate pretty well between replicates.
 
 ---
 
@@ -545,8 +458,10 @@ ggplot(tf_activity_chromVAR_dev %>%
   geom_point(size = 3, shape = 21, fill = "grey") +
   theme(aspect.ratio = 2.5)
 ```
+Conclusion: Sox2 reporter activity drops upon Sox2 depletion.
 
 ---
+
 ## Correlate primetime FCs with chromVAR FCs
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 tf_activity_chromVAR_dev <- prime_activities_comb %>%
@@ -593,6 +508,8 @@ ggplot(tf_activity_chromVAR_dev %>%
   facet_wrap(~condition)
 
 ## mES - NPC comparison
+prime_reporters <- read_csv("/DATA/shared/projects/TF_REPORTERS/SuRE-TF/data/best_reporters.csv") %>%
+  mutate(reporter_id = ifelse(tf == "POU5F1::SOX2", "POU5F1::SOX2_5bp_21bp_minP_1", reporter_id)) 
 prime_tfs <- prime_reporters$tf[prime_reporters$conf_level > 1]
 
 ggplot(tf_activity_chromVAR_dev %>%
@@ -726,7 +643,7 @@ for (i in unique(tf_activity_chromVAR_dev$condition)) {
   print(p)
 }
 ```
-
+Conclusion: There's a lot to see here. In some conditions, there's a pretty good overlap between the changing TFs, in other conditions not.
 
 ---
 
@@ -794,7 +711,7 @@ ggplot(tf_activity_chromVAR_dev %>%
   labs(x = "Timepoint (h)", y = "Reporter activity (FC)")
 
 ```
-
+Conclusion: TF reporters drop over time, chromVAR signal stays similar.
 
 ---
 
@@ -849,11 +766,11 @@ ggplot(target_plot %>% filter(method == "chromVAR_zscore_dif_mean"), aes(x = tf,
   theme(aspect.ratio = 2) +
   ylim(-0.3, 0.3)
 ```
+Conclusion: TF reporters are more sensitive overall.
 
 ---
 
 ## Number of upregulated & downregulated per condition and method
-
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 ## Number of upregulated & downregulated per condition and method
 up_down_reg <- tf_activity_chromVAR_dev %>%
@@ -874,9 +791,9 @@ ggplot(up_down_reg, aes(x = condition, fill = sig_comb)) +
 
 ```
 
+---
 
 ## Comparing target TFs rank between chromVAR and primeTF
-
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 ## Compute ranks
 target_conditions <- data.frame(condition = c("mES_CH", "mES_FOXA1_OE", "mES_LIF",
@@ -936,14 +853,16 @@ pheatmap(target_ranks_matrix,
   
 
 ```
-
+Conclusion: For some TFs, chromVAR does not pick up well changes in activity.
+---
 
 ## Compare chromVAR computed using our data with data from de Wit's lab
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 # Load chromVAR activities computed from de Wit's data
 chromvar_scores_teun <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_teun.rds") %>%
-  distinct(tf, "chromVAR_zscore_dif_mean" = dif_chromVAR_zscore, condition) %>%
-  mutate(source = "teun")
+  distinct(tf, chromVAR_zscore_dif_mean, condition) %>%
+  mutate(source = "teun") %>%
+  mutate(condition = gsub("SOX2.*", "SOX2", condition))
 
 chromvar_scores_mouse_comp <- chromvar_scores_mouse_added_all %>%
   distinct(chromVAR_zscore_dif_mean, tf, condition) %>%
@@ -963,11 +882,10 @@ ggplot(chromvar_scores_mouse_comp %>%
   geom_text_repel(aes(label = tf), box.padding = 0.5) +
   geom_point(size = 3, shape = 21, fill = "grey") +
   labs(x = "chromVAR deviation z-score dif (gen)", y = "chromVAR deviation z-score dif (teun)") +
-  theme(aspect.ratio = 1) +
-  ylim(-52, 20) +
-  xlim(-52, 20) 
+  theme(aspect.ratio = 1)
 ```
 
+---
 
 ## Compare chromVAR with logOR of motif accessibility
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
@@ -1001,175 +919,6 @@ ggplot(motif_statistics,
 ```
 
 ---
-
-
-## Compare TF activity to RNA-seq change (DESeq2)
-```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
-# Load DESeq2 results
-tf_deseq <- readRDS("~/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/deseq_changed_LIF.rds") %>%
-  mutate(tf = ifelse(tf == "ARNT", "AHR::ARNT", tf)) %>%
-  mutate(tf = ifelse(tf == "FOS", "FOS::JUN", tf)) %>%
-  mutate(tf = ifelse(tf == "NFE2", "MAF::NFE2", tf)) %>%
-  mutate(tf = ifelse(tf == "NR1H4", "NR1H4::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "NR4A2", "NR4A2::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "PPARA", "PPARA::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "RARA", "RARA:RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "STAT2", "STAT1::STAT2", tf)) %>%
-  mutate(tf = ifelse(tf == "TRP53", "TP53", tf)) %>%
-  mutate(tf = ifelse(tf == "VDR", "VDR::RXRA", tf))
-
-tf_deseq_pou <- tf_deseq %>%
-  filter(tf == "POU5F1") %>%
-  mutate(tf = ifelse(tf == "POU5F1", "POU5F1::SOX2", tf))
-
-tf_deseq <- rbind(tf_deseq, tf_deseq_pou)
-
-prime_activities_deseq <- prime_activities %>%
-  filter(condition == "mES_LIF") %>%
-  distinct(tf, reporter_activity_dif_sample) %>%
-  mutate(reporter_activity_dif_sample = ave(reporter_activity_dif_sample, tf, FUN = mean)) %>%
-  distinct() %>%
-  left_join(tf_deseq)
-  
-ggplot(prime_activities_deseq,
-       aes(x = reporter_activity_dif_sample, y = lfc)) +
-  geom_point(aes(size = basal_exp)) +
-  geom_label_repel(aes(label = tf), box.padding = 0.5, point.padding = 0.5) +
-  geom_smooth(method = "lm", color = "red") +
-  geom_abline(lty = 2) +
-  ylim(-4,2) +
-  xlim(-4,2) +
-  labs(x = "TF activity change (Reporters)", y = "TF abundance log fold change (RNA-seq)") +
-  theme_pubr(legend = "none") +
-  labs_pubr()
-
-```
-
----
-
-## Compare reporter activity to VIPER-inferred TF activity
-```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
-# Load VIPER results
-viper_activities <- readRDS("~/rojects/ATAC_TF_reporter_comparison/RNA_seq_analyses/tf_activities_viper.rds")  %>%
-  mutate(tf = ifelse(tf == "ARNT", "AHR::ARNT", tf)) %>%
-  mutate(tf = ifelse(tf == "FOS", "FOS::JUN", tf)) %>%
-  mutate(tf = ifelse(tf == "NFE2", "MAF::NFE2", tf)) %>%
-  mutate(tf = ifelse(tf == "NR1H4", "NR1H4::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "NR4A2", "NR4A2::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "PPARA", "PPARA::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "RARA", "RARA:RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "STAT2", "STAT1::STAT2", tf)) %>%
-  mutate(tf = ifelse(tf == "TRP53", "TP53", tf)) %>%
-  mutate(tf = ifelse(tf == "VDR", "VDR::RXRA", tf))
-
-viper_activities_pou <- viper_activities %>%
-  filter(tf == "POU5F1") %>%
-  mutate(tf = ifelse(tf == "POU5F1", "POU5F1::SOX2", tf))
-
-viper_activities_dif <- rbind(viper_activities, viper_activities_pou) %>%
-  mutate(condition = gsub("_r[1-3]{1}$", "", sample)) %>%
-  mutate(viper_activity = ave(viper_activity, tf, condition, FUN = mean)) %>%
-  distinct(viper_activity, tf, condition) %>%
-  mutate(condition = ifelse(condition == "mES_2i", "mES_LIF", condition)) %>%
-  spread(condition, viper_activity) %>%
-  mutate(viper_dif = mES_LIF - mES_2i_LIF) %>%
-  pivot_longer(cols = c("mES_LIF", "mES_2i_LIF"), names_to = "condition", 
-               values_to = "viper_activity") %>%
-  mutate(viper_dif = ifelse(condition == "mES_2i_LIF", NA, viper_dif))
-
-prime_activities_viper <- prime_activities %>%
-  filter(condition %in% c("mES_LIF", "mES_2i_LIF")) %>%
-  distinct(tf, condition, reporter_activity_dif_sample, reporter_activity_minP) %>%
-  mutate(reporter_activity_dif_sample = ave(reporter_activity_dif_sample, tf, condition, FUN = mean)) %>%
-  mutate(reporter_activity_minP = ave(reporter_activity_minP, tf, condition, FUN = mean)) %>%
-  distinct() %>%
-  left_join(viper_activities_dif)
-
-ggplot(prime_activities_viper %>%
-         filter(condition == "mES_LIF"),
-       aes(x = viper_dif, y = reporter_activity_dif_sample)) +
-  geom_point() +
-  geom_label_repel(aes(label = tf), box.padding = 0.5, point.padding = 0.5) +
-  geom_smooth(method = "lm", color = "red") +
-  geom_abline(lty = 2) +
-  labs(x = "TF activity change (VIPER)", y = "TF activity change (reporters)") +
-  theme_pubr(legend = "none") +
-  labs_pubr()
-
-ggplot(prime_activities_viper,
-       aes(x = viper_activity, y = log2(reporter_activity_minP))) +
-  geom_point() +
-  geom_label_repel(aes(label = tf), box.padding = 0.5, point.padding = 0.5) +
-  geom_smooth(method = "lm", color = "red") +
-  geom_abline(lty = 2) +
-  labs(x = "TF activity (VIPER)", y = "TF activity (reporters)") +
-  theme_pubr(legend = "none") +
-  
-  facet_wrap(~condition)
-```
-
----
-
-## Compare reporter activity to ISMARA-inferred TF activity
-```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
-# Load VIPER results
-ismara_activities <- readRDS("~/projects/ATAC_TF_reporter_comparison/RNA_seq_analyses/ismara_activities.rds")  %>%
-  mutate(tf = ifelse(tf == "ARNT", "AHR::ARNT", tf)) %>%
-  mutate(tf = ifelse(tf == "FOS", "FOS::JUN", tf)) %>%
-  mutate(tf = ifelse(tf == "NFE2", "MAF::NFE2", tf)) %>%
-  mutate(tf = ifelse(tf == "NR1H4", "NR1H4::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "NR4A2", "NR4A2::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "PPARA", "PPARA::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "RARA", "RARA:RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "STAT2", "STAT1::STAT2", tf)) %>%
-  mutate(tf = ifelse(tf == "TRP53", "TP53", tf)) %>%
-  mutate(tf = ifelse(tf == "VDR", "VDR::RXRA", tf)) %>%
-  mutate(tf = ifelse(tf == "TCF7_TCF7L2", "TCF7", tf)) %>%
-  mutate(tf = ifelse(tf == "STAT4_STAT3_STAT5B", "STAT3", tf))
-
-ismara_activities_pou <- ismara_activities %>%
-  filter(tf == "POU5F1") %>%
-  mutate(tf = ifelse(tf == "POU5F1", "POU5F1::SOX2", tf))
-
-ismara_activities <- rbind(ismara_activities, ismara_activities_pou) %>%
-  mutate(condition = ifelse(condition == "mES_2i", "mES_LIF", condition))
-
-prime_activities_ismara <- prime_activities %>%
-  filter(condition %in% c("mES_LIF", "mES_2i_LIF")) %>%
-  distinct(tf, condition, reporter_activity_dif_sample, reporter_activity_minP) %>%
-  mutate(reporter_activity_dif_sample = ave(reporter_activity_dif_sample, tf, condition, FUN = mean)) %>%
-  mutate(reporter_activity_minP = ave(reporter_activity_minP, tf, condition, FUN = mean)) %>%
-  distinct() %>%
-  left_join(ismara_activities)
-
-ggplot(prime_activities_ismara %>%
-         filter(condition == "mES_LIF") %>%
-         distinct(tf, ismara_activity_dif, reporter_activity_dif_sample, replicate),
-       aes(x = ismara_activity_dif, y = reporter_activity_dif_sample)) +
-  geom_point() +
-  geom_label_repel(aes(label = tf), box.padding = 0.5, point.padding = 0.5) +
-  geom_smooth(method = "lm", color = "red") +
-  geom_abline(lty = 2) +
-  labs(x = "TF activity change (VIPER)", y = "TF activity change (reporters)") +
-  theme_pubr(legend = "none") +
-  
-  facet_wrap(~replicate)
-
-# ggplot(prime_activities_ismara,
-#        aes(x = viper_activity, y = log2(reporter_activity_minP))) +
-#   geom_point() +
-#   geom_label_repel(aes(label = tf), box.padding = 0.5, point.padding = 0.5) +
-#   geom_smooth(method = "lm", color = "red") +
-#   geom_abline(lty = 2) +
-#   labs(x = "TF activity (VIPER)", y = "TF activity (reporters)") +
-#   theme_pubr(legend = "none") +
-#   
-#   facet_wrap(~condition)
-```
-
-
-
-
 
 # Session Info
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
