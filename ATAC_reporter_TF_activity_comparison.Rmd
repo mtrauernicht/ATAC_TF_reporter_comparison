@@ -479,6 +479,27 @@ tf_activity_chromVAR_dev <- prime_activities_comb %>%
   mutate(sig_chrom = ifelse(p_value_adjusted < 0.05 & chromVAR_zscore_dif_mean > 0, "Upregulated", "NS"),
          sig_chrom = ifelse(p_value_adjusted < 0.05 & chromVAR_zscore_dif_mean < 0, "Downregulated", sig_chrom))
 
+# Export dataset for supplementary data
+tf_activity_chromVAR_dev_export <- tf_activity_chromVAR_dev %>%
+  dplyr::select(tf, condition, "primetime_logFC" = logFC, "chromVAR_dif" = chromVAR_zscore_dif_mean,
+                "primetime_sign" = sig, "chromVAR_sign" = sig_chrom, "primetime_pval_adj" = p_adjusted,
+                "chromVAR_pval_adj" = p_value_adjusted) %>%
+  mutate(condition = ifelse(condition == "mES_CH", "Chiron_removal", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_FOXA1_OE", "FOXA1_overexpression", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF", "LIF_removal_24h", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_POU5F1_DEG", "POU5F1_degradation", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_SOX2_DEG", "SOX2_degradation", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_FBS", "Serum", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_FK", "Forskolin", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_Heat", "Heat_shock", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF_1h", "LIF_removal_1h", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF_3h", "LIF_removal_3h", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_LIF_6h", "LIF_removal_6h", condition)) %>%
+  mutate(condition = ifelse(condition == "NPC_DMSO", "mNPC_differentiation", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_TFCP2L1", "TFCP2L1_knockdown", condition)) %>%
+  arrange(tf)
+
+write_csv(tf_activity_chromVAR_dev_export, "dataset_ev1.csv")
 
 ggplot(tf_activity_chromVAR_dev %>%
          filter(!condition %in% c("mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "NPC_DMSO")) %>%
