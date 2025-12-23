@@ -14,12 +14,9 @@ This repository contains the analysis and code for comparing transcription facto
 
 ## Project Structure
 
-- **`/data/`**: Contains datasets used for the analysis, including:
-  - TF reporter assay data
-  - ATAC-seq data
-  - RNA-seq data
-- **`/ATAC_seq_analyses/`**: Contains all analysis pipelines to analyze the raw ATAC-seq data.
-- **`/TF_reporter_analyses/`**: Contains computation of TF activity from TF reporter assays + computation of TF activity from ATAC-seq & RNA-seq and their comparison.
+- **`ATAC_reporter_TF_activity_comparison.Rmd`**: Contains all code used to make Figures. 
+- **`/ATAC_seq_analyses/`**: Contains all analysis pipelines to analyze the raw ATAC-seq data and the analysis using chromVAR.
+- **`/TF_reporter_analyses/`**: Contains computation of TF activity from TF reporter assays using primetime.
 
 
 ## Contact
