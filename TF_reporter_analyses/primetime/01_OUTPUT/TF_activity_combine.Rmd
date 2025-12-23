@@ -180,7 +180,7 @@ prime_activities <- cDNA_df %>%
   mutate(reporter_activity_minP = ave(reporter_activity_minP, tf, condition, replicate, FUN = function(x) mean(x, na.rm = T))) %>%
   distinct() %>%
   mutate(replicate = toupper(replicate)) %>%
-  filter(condition %in% c("mES_SOX2_DEG", "mES_POU5F1_DEG", "mES_FOXA1_OE", "mES_PD", "mES_CH", "mES_LIF", "U2OS_PMA", "U2OS_Heat", "U2OS_Calcitriol", "MCF7_Hexestrol", "mES_2i_LIF"))
+  filter(condition %in% c("mES_SOX2_DEG", "mES_POU5F1_DEG", "mES_FOXA1_OE", "mES_PD", "mES_CH", "mES_LIF", "mES_2i_LIF"))
 
 
 ## Import primetime-computed activities of all conditions
@@ -223,6 +223,13 @@ prime_activities_comb <- rbind.fill(prime_activities_comb, primetime_activities_
 
 
 write_csv(prime_activities_comb, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20250220_prime_reporter_activities_combined.csv")
+
+prime_activities_comb_simpl <- prime_activities_comb %>%
+  mutate(logFC = ave(logFC, condition, tf, FUN = function(x) mean(x, na.rm = T))) %>%
+  dplyr::select(-replicate) %>%
+  distinct()
+
+write_csv(prime_activities_comb_simpl, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20250220_prime_reporter_activities_combined_simpl.csv")
 ```
 
 
