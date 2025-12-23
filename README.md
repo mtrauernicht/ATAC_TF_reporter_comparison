@@ -1,5 +1,7 @@
 # Systematic comparison of estimates of transcription factor activity by ATAC-seq and multiplexed reporter assays
 
+<a href="https://doi.org/10.5281/zenodo.18019661"><img src="https://zenodo.org/badge/819850868.svg" alt="DOI"></a>
+
 ## Overview
 
 This repository contains the analysis and code for comparing transcription factor (TF) activity measurements obtained via two methods: **TF Reporter Assays** and indirect detection using **ATAC-seq**.
