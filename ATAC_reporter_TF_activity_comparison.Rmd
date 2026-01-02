@@ -145,7 +145,7 @@ force_zero_axes <- function(p) {
 
 ## Load pre-computed TF reporter and chromVAR data
 ```{r out.width= "80%", fig.align= "center"}
-prime_activities_comb <- read_csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20250220_prime_reporter_activities_combined.csv")
+prime_activities_comb <- read_csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20260101_prime_reporter_activities_combined.csv")
 
 chromvar_scores_mouse_added_all <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
 ```
@@ -322,11 +322,11 @@ Conclusion: Not much correlation on steady-state level. We should probably look 
 ```{r out.width= "80%", fig.align= "center", warning = FALSE, message= FALSE}
 ## Correlate chromVAR activities with measured activity
 tf_activity_chromVAR_dev <- prime_activities_comb %>%
-  distinct(tf, logFC, replicate, condition)
+  distinct(tf, reporterFC, replicate, condition)
 
 ## Correlation between replicates within assays
 tf_activity_chromVAR_dev_2 <- tf_activity_chromVAR_dev %>%
-  spread(replicate, logFC)
+  spread(replicate, reporterFC)
 
 ggplot(tf_activity_chromVAR_dev_2, aes(x = R1, y = R2)) +
   geom_smooth(method = "lm", color = "red") +
@@ -764,7 +764,7 @@ target_plot <- target_conditions %>%
                names_to = "method") %>%
   mutate(tf = factor(tf, levels = c("HSF1", "FOXA1", "CREB1",
                                        "SRF", "TFCP2L1", "POU5F1::SOX2",
-                                       "SOX2", "STAT3", "TCF7")))
+                                        "STAT3", "SOX2", "TCF7")))
 
 # Create the double-sided bar plot
 ggplot(target_plot %>% filter(method == "logFC"), aes(x = tf, y = activity, fill = sig)) +
