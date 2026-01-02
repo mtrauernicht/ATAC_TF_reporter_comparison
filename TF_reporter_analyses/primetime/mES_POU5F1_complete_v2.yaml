@@ -11,28 +11,31 @@ INPUT_DATA:
     is_pdna: False
     condition: DMSO
     fastq:
-      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_18_HEPG2_DMSO_r1_TTATAACC-CGTCTGCG_S18_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_14_mES_POU5F1_ctrl_r2_GCTTGTCA-TCGATATC_S14_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_31_mES_SOX2_ctrl_r1_TGGATCGA-TACTCATA_S31_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7824/NXT447_fastq_files/7824_14_mES_POU5F1_ctrl_r1_GCTTGTCA-TCGATATC_S14_R1_001.fastq.gz
 
-  mESC_FOXA1:
+  mESC_POU5F1:
     is_pdna: False
-    condition: FOXA1
+    condition: POU5F1
     fastq:
-      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_17_HEPG2_CDCA_r1_CCGCGGTT-CGTCTGCG_S17_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_13_mES_POU5F1_DEG_r2_ATCCACTG-TCGATATC_S13_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_30_mES_SOX2_DEG_r1_CAAGCTAG-TACTCATA_S30_R1_001.fastq.gz
+      - /shared/gcf/m.trauernicht/7824/NXT447_fastq_files/7824_13_mES_POU5F1_DEG_r1_ATCCACTG-TCGATATC_S13_R1_001.fastq.gz
 
   pDNA:
     is_pdna: True
     condition: None
     fastq: 
       #- /shared/gcf/m.trauernicht/7785/NXT439_fastq_files/7785_34_pDNA_E2569_CCGCGGTT-TATCGCAC_S34_R1_001.fastq.gz
-      #- /shared/gcf/m.trauernicht/7027/fastq_files/7027_73_pDNA_E2035_CCGCGGTT-TCTGTTGG_S73_R1_001.fastq.gz
-      - - /shared/gcf/h.yucel/8025/M1115_fastq_files/8025_17_pDNA_pMT52_5_V2_0_CCACCAGGCA-CGAGGTCGGA_S17_R1_001.fastq.gz
+      - /shared/gcf/h.yucel/8025/M1115_fastq_files/8025_17_pDNA_pMT52_5_V2_0_CCACCAGGCA-CGAGGTCGGA_S17_R1_001.fastq.gz
 # ==============================================================================
 COMPARATIVE_ANALYSIS:
   REFERENCE_CONDITION: DMSO
-  CONTRAST_CONDITION: FOXA1
+  CONTRAST_CONDITION: POU5F1
 
 # =============================================================================
-OUTPUT_DIRECTORY: 01_OUTPUT/mES_FOXA1
+OUTPUT_DIRECTORY: 01_OUTPUT/mES_POU5F1_v2_r123
 
 
 # ==============================================================================

@@ -158,13 +158,9 @@ force_zero_axes <- function(p) {
 ### Loading reporter activities
 
 ```{r out.width= "80%", fig.align= "center"}
-# Import TF reporter activities (only of the identified prime reporters)
-## Import reporter activities
+## Import reporter activities computed from previous script - manually calculated activities of individual replicates
 cDNA_df <- read.csv("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20240724_reporter_activity_filt_combined_complete.csv", header = T) %>%
   mutate(tf = gsub("_.*", "", tf))
-
-# Load RNA-seq data
-tf_rna <- read_tsv("/DATA/usr/m.trauernicht/data/RNA_seq/rna_tpm_all_tfs.tsv")
 
 ## Import prime reporters
 prime_reporters <- read_csv("/DATA/shared/projects/TF_REPORTERS/SuRE-TF/data/best_reporters.csv") %>%
@@ -184,7 +180,7 @@ prime_activities <- cDNA_df %>%
 
 
 ## Import primetime-computed activities of all conditions
-base_dir <- "~/projects/prime_TF_reporters/mES_ATAC_primetime/01_OUTPUT"
+base_dir <- "~/projects/ATAC_TF_reporter_comparison/TF_reporter_analyses/primetime/01_OUTPUT"
 sub_dirs <- list.dirs(base_dir, recursive = FALSE)
 file_paths <- file.path(sub_dirs, "primetime_results", "primetime_results.txt")
 file_paths <- file_paths[file.exists(file_paths)]
@@ -198,31 +194,24 @@ data_list <- map(file_paths, read_and_process)
 primetime_activities_all <- bind_rows(data_list) %>%
   filter(str_detect(tf, "RANDOM", negate = T))
 
-primetime_activities_all_1 <- primetime_activities_all %>%
-  filter(condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
+primetime_activities_all <- primetime_activities_all %>%
   mutate(condition = ifelse(condition == "mES_LIF24", "mES_LIF", condition)) %>%
   mutate(condition = ifelse(condition == "mES_SOX2", "mES_SOX2_DEG", condition)) %>%
   mutate(condition = ifelse(condition == "mES_POU5F1", "mES_POU5F1_DEG", condition)) %>%
   mutate(condition = ifelse(condition == "mES_FOXA1", "mES_FOXA1_OE", condition)) %>%
-  dplyr::select(-logFC, -ctrl_activity)
-
-primetime_activities_all_2 <- primetime_activities_all %>%
-  filter(!condition %in% c("mES_CH", "mES_FOXA1", "mES_LIF24", "mES_POU5F1", "mES_SOX2")) %>%
   distinct(tf, condition, logFC, p_adjusted, sig, ctrl_activity)
 
-
+## Combine primetime activities with individual replicate activity data
 prime_activities_comb <- prime_activities %>%
   filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG", "mES_SOX2_DEG")) %>%
-  dplyr::select(tf, condition, "logFC" = reporter_activity_dif_sample, replicate, ctrl_activity) %>%
-  left_join(primetime_activities_all_1)
-
-prime_activities_comb <- rbind.fill(prime_activities_comb, primetime_activities_all_2) %>%
+  dplyr::select(tf, condition, "reporterFC" = reporter_activity_dif_sample, replicate) %>%
+  join(primetime_activities_all, type = "full") %>%
   filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG",
                           "mES_SOX2_DEG", "mES_FBS", "mES_FK", "mES_Heat", "mES_LIF1",
                           "mES_LIF3", "mES_LIF6", "mES_TFCP2L1", "mES_NPC"))
 
 
-write_csv(prime_activities_comb, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20250220_prime_reporter_activities_combined.csv")
+write_csv(prime_activities_comb, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20260101_prime_reporter_activities_combined.csv")
 
 prime_activities_comb_simpl <- prime_activities_comb %>%
   mutate(logFC = ave(logFC, condition, tf, FUN = function(x) mean(x, na.rm = T))) %>%

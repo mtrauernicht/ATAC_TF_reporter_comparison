@@ -34,7 +34,7 @@ COMPARATIVE_ANALYSIS:
   CONTRAST_CONDITION: SOX2
 
 # =============================================================================
-OUTPUT_DIRECTORY: 01_OUTPUT/mES_SOX2
+OUTPUT_DIRECTORY: 01_OUTPUT/mES_SOX2_r123
 
 
 # ==============================================================================
