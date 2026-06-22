@@ -8,13 +8,14 @@ library(data.table)
 
 # Data --------------------------------------------------------------------
 
-meta <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES.rds")
+meta <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES_selected_mt20260420.rds")
 
-peaks_7784 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/7784_peaks_fixed.bed")
-peaks_7822 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/7822_peaks_fixed.bed")
-peaks_8010 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/8010_peaks_fixed.bed")
-peaks_8011 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse/8011_peaks_fixed.bed")
-peaks <- c(peaks_7784, peaks_7822, peaks_8010, peaks_8011)
+peaks_7784 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse_selected_mt20260420/7784_peaks_fixed.bed")
+peaks_7822 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse_selected_mt20260420/7822_peaks_fixed.bed")
+peaks_8010 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse_selected_mt20260420/8010_peaks_fixed.bed")
+peaks_8011 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse_selected_mt20260420/8011_peaks_fixed.bed")
+peaks_8641 <- import("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse_selected_mt20260420/8641_peaks_fixed.bed")
+peaks <- c(peaks_7784, peaks_7822, peaks_8010, peaks_8011, peaks_8641)
 peaks <- as(peaks, "GNCList")
 
 
@@ -25,11 +26,11 @@ meta <- meta[order(interaction(meta$celltype, meta$treatment, meta$replicate)),]
 #rep <- tapply(meta$celltype, interaction(meta$celltype, meta$treatment, meta$replicate))
 #meta$rep <- unlist(rep)
 meta$alias <- paste(meta$celltype, meta$treatment, meta$replicate, sep = "_")
-meta$celltype <- factor(meta$celltype, levels = c("mES", "NPC"))
+meta$celltype <- factor(meta$celltype, levels = c("mES", "NPC", "mNPC"))
 meta$treatment <- factor(meta$treatment, levels = c("2i_LIF", "FOXA1_OE", "FOXA1_ctrl", "SOX2_DEG", "SOX2_ctrl", "POU5F1_DEG", "POU5F1_ctrl",
                                                     "LIF", "CH", "PD", "TFCP2L1", "SP1", "vitC", "NT", "FK", "FK_new",
                                                      "PMA", "Nutlin", "10PD", "FBS", "LIF_1h", "LIF_3h", "LIF_6h",
-                                                      "HQ_1h", "HQ_3h", "HQ_6h", "Heat", "DMSO", "cGAMP", "HQ"))
+                                                      "HQ_1h", "HQ_3h", "HQ_6h", "Heat", "DMSO", "cGAMP", "HQ", "FS_4h", "FS_24h", "HS", "Norm"))
 meta$replicate <- factor(meta$replicate, levels=c("R1", "R2", "R3", "R4"))
 
 # Count -------------------------------------------------------------------
@@ -55,4 +56,4 @@ exp <- SummarizedExperiment(
   colData = meta
 )
 
-saveRDS(exp, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
+saveRDS(exp, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20260420.rds")

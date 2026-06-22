@@ -7,9 +7,11 @@ path_bgzip <- "/DATA/usr/t.filipovska/software/Miniconda3/pkgs/tabix-0.2.6-ha92a
 
 # Directories and data ----------------------------------------------------
 
-files_df <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES.rds")
+files_df <- readRDS("/home/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES_selected_mt20260420.rds")
 macs2 <- "/DATA/usr/t.filipovska/software/Miniconda3/envs/tf_activity/bin/macs2"
-peak_dir <- "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse"
+peak_dir <- "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bed_peaks/mouse_selected_mt20260420"
+bedtools <- "/usr/bin/bedtools"
+genome_sizes <- "/DATA/usr/m.trauernicht/data/genomes/mm10/mm10.chrom.sizes"
 
 exps <- split(files_df$tabix_file, files_df$run)
 #exps[names(exps) != "technical"]
@@ -33,15 +35,34 @@ call_macs2 <- function(file, name) {
   system(cmd)
 }
 
+make_fixed_peaks <- function(narrowpeak_file, fixed_file) {
+  cmd <- paste(
+    "awk 'BEGIN{OFS=\"\\t\"} {summit=$2+$10; if(summit<0) summit=0; print $1, summit, summit+1, $4, $9, \".\"}'",
+    shQuote(narrowpeak_file),
+    "|",
+    bedtools,
+    "slop -i - -g",
+    shQuote(genome_sizes),
+    "-l 249 -r 250",
+    "| awk 'BEGIN{OFS=\"\\t\"} {print $1,$2,$3,$4,$5}' >",
+    shQuote(fixed_file)
+  )
+  status <- system(cmd)
+  stopifnot(status == 0)
+}
+
 
 for (expname in names(exps)) {
   tabixes <- exps[[expname]]
-  peakfile <- paste0(peak_dir, expname, "_peaks.narrowPeak")
-  if (file.exists(peakfile)) {
-    next
+  peakfile <- file.path(peak_dir, glue("{expname}_peaks.narrowPeak"))
+  fixedfile <- file.path(peak_dir, glue("{expname}_peaks_fixed.bed"))
+  if (!file.exists(peakfile)) {
+    temp <- merge_tabixes(tabixes)
+    call_macs2(temp, expname)
+    unlink(temp)
   }
-  temp <- merge_tabixes(tabixes)
-  call_macs2(temp, expname)
-  unlink(temp)
+  if (!file.exists(fixedfile)) {
+    make_fixed_peaks(peakfile, fixedfile)
+  }
 }
 

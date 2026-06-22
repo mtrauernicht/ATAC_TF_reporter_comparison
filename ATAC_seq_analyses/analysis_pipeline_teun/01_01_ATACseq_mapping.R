@@ -15,12 +15,12 @@ library(withr)
 
 # Files -------------------------------------------------------------------
 
-bam_dir <- "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES_selected"
+bam_dir <- "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES_selected_mt20260420"
 genome <- "/DATA/usr/m.trauernicht/data/genomes/mm10/genome/fasta/mm10bwaidx"
 picard <- "/DATA/usr/m.trauernicht/software/picard.jar"
-table_out <- here("ATAC_seq_analyses/rds", "bamfile_atacseq_metadata_mES_selected.rds")
+table_out <- "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES_selected_mt20260420.rds"
 
-files <- read.table("ATAC_seq_analyses/ATAC_seq_samples.tsv", 
+files <- read.table("ATAC_seq_analyses/ATAC_seq_samples_mt20260420.tsv", 
                     sep = "\t", stringsAsFactors = FALSE, header = TRUE)
 
 # Declare merges ----------------------------------------------------------

@@ -186,7 +186,7 @@ file_paths <- file.path(sub_dirs, "primetime_results", "primetime_results.txt")
 file_paths <- file_paths[file.exists(file_paths)]
 read_and_process <- function(file) {
   data <- read_delim(file) %>%
-    select(logFC, tf, p_adjusted, sig, "ctrl_activity" = DMSO) %>%  # Keep only selected columns
+    dplyr::select(logFC, tf, p_adjusted, sig, ctrl_activity = 4) %>%  # Keep only selected columns
     mutate(condition = basename(dirname(dirname(file))))  # Extract unique subdirectory name
   return(data)
 }
@@ -208,17 +208,18 @@ prime_activities_comb <- prime_activities %>%
   join(primetime_activities_all, type = "full") %>%
   filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF", "mES_POU5F1_DEG",
                           "mES_SOX2_DEG", "mES_FBS", "mES_FK", "mES_Heat", "mES_LIF1",
-                          "mES_LIF3", "mES_LIF6", "mES_TFCP2L1", "mES_NPC"))
+                          "mES_LIF3", "mES_LIF6", "mES_TFCP2L1", "mES_NPC", "NPC_FS_24h",
+                          "NPC_FS_4h", "NPC_HS"))
 
 
-write_csv(prime_activities_comb, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20260101_prime_reporter_activities_combined.csv")
+write_csv(prime_activities_comb, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20260430_prime_reporter_activities_combined.csv")
 
 prime_activities_comb_simpl <- prime_activities_comb %>%
   mutate(logFC = ave(logFC, condition, tf, FUN = function(x) mean(x, na.rm = T))) %>%
   dplyr::select(-replicate) %>%
   distinct()
 
-write_csv(prime_activities_comb_simpl, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20250220_prime_reporter_activities_combined_simpl.csv")
+write_csv(prime_activities_comb_simpl, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20260430_prime_reporter_activities_combined_simpl.csv")
 ```
 
 

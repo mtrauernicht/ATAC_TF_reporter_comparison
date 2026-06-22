@@ -51,7 +51,20 @@ df <- tibble::tribble(
 "7784",	"18_mES_SOX2_ctrl_r2_CAGAGAGG-CTCCTTAC_S18",	"mES", "SOX2_ctrl",	"R3",
 "7784",	"17_mES_SOX2_DEG_r2_CTCTCTAC-CTCCTTAC_S17",	"mES", "SOX2_DEG",	"R3",
 "8011",	"9_mES_TFCP2L1_r3_TAAGGCGA-ATAGAGAG_S9",	"mES", "TFCP2L1",	"R3",
-"8010",	"19_NPC_r4_GGACTCCT-TACTCCTT_S19",	"NPC", "DMSO",	"R4"
+"8010",	"19_NPC_r4_GGACTCCT-TACTCCTT_S19",	"NPC", "DMSO",	"R4",
+"8641",	"1_mNPC_DMSO_R1_TAAGGCGA-GCGATCTA_S1",	"mNPC", "DMSO",	"R1",
+"8641",	"2_mNPC_FS_4h_R1_CGTACTAG-ATAGAGAG_S2",	"mNPC", "FS_4h",	"R1",
+"8641",	"3_mNPC_FS_24h_R1_AGGCAGAA-AGAGGATA_S3",	"mNPC", "FS_24h",	"R1",
+"8641",	"4_mNPC_HS_R1_TCCTGAGC-TCTACTCT_S4",	"mNPC", "HS",	"R1",
+"8641",	"5_mNPC_norm_R2_GGACTCCT-CTCCTTAC_S5",	"mNPC", "Norm",	"R2",
+"8641",	"6_mNPC_HS_R2_TAGGCATG-TATGCAGT_S6",	"mNPC", "HS",	"R2",
+"8641",	"7_mNPC_DMSO_R2_CTCTCTAC-TACTCCTT_S7",	"mNPC", "DMSO",	"R2",
+"8641",	"8_mNPC_FS_4h_R2_CAGAGAGG-AGGCTTAG_S8",	"mNPC", "FS_4h",	"R2",
+"8641",	"9_mNPC_FS_24h_R2_TAAGGCGA-ATAGAGAG_S9",	"mNPC", "FS_24h",	"R2",
+"8641",	"10_mNPC_norm_R3_TAAGGCGA-AGAGGATA_S10",	"mNPC", "Norm",	"R3",
+"8641",	"11_mNPC_HS_R3_TAAGGCGA-TCTACTCT_S11",	"mNPC", "HS",	"R3",
+"8641",	"12_mNPC_DMSO_R3_TAAGGCGA-CTCCTTAC_S12",	"mNPC", "DMSO",	"R3",
+"8641",	"13_mNPC_FS_24h_R3_TAAGGCGA-TATGCAGT_S13",	"mNPC", "FS_24h",	"R3"
 )
 
 # Files -------------------------------------------------------------------
@@ -120,6 +133,6 @@ df <- transform(
 # Export ------------------------------------------------------------------
 
 write_tsv(
-  df, "~/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/ATAC_seq_samples.tsv"
+  df, "~/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/ATAC_seq_samples_mt20260420.tsv"
   
 )

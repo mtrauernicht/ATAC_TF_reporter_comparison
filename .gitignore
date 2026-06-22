@@ -71,3 +71,5 @@ TF_reporter_analyses/data
 # Ignore any tmp_primetime directories under primetime (any depth) and their contents
 TF_reporter_analyses/primetime/**/tmp_primetime/
 TF_reporter_analyses/primetime/**/tmp_primetime/**
+TF_reporter_analyses/primetime/.snakemake/
+TF_reporter_analyses/primetime/primetime_v1.0.0/

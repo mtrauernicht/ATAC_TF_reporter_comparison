@@ -10,10 +10,10 @@ library(glue)
 path_bgzip <- "/DATA/usr/t.filipovska/software/Miniconda3/pkgs/tabix-0.2.6-ha92aebf_0/bin"
 
 # Files and directories ---------------------------------------------------
-files <- readRDS(here("ATAC_seq_analyses/rds", "bamfile_atacseq_metadata_mES.rds"))
+files <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES_selected_mt20260420.rds")
 dir <- "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/"
-dir_in  <- glue("{dir}bam/mES")
-dir_out <- glue("{dir}tabix/mouse")
+dir_in  <- glue("{dir}bam/mES_selected_mt20260420")
+dir_out <- glue("{dir}tabix/mouse_selected_mt20260420")
 
 bamfiles <- files$bam_file
 bamfiles <- BamFileList(bamfiles, yieldSize = 1e6L, asMates = TRUE)
@@ -107,4 +107,4 @@ for(i in seq_along(bamfiles)) {
 }
 
 files$tabix_file <- tabixfiles
-saveRDS(files, here("ATAC_seq_analyses/rds", "bamfile_atacseq_metadata_mES.rds"))
+saveRDS(files, "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES_selected_mt20260420.rds")

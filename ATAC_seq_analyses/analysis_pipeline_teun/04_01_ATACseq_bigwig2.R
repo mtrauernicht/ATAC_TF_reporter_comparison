@@ -14,9 +14,9 @@ library(dplyr)
 
 # Directories and data ----------------------------------------------------
 
-files_df <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES.rds")
-bw_dir <- "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/mouse_all"
-size_factors <- read_csv("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/size_factors_deseq_mt20250423.csv") %>%
+files_df <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/bamfile_atacseq_metadata_mES_selected_mt20260420.rds")
+bw_dir <- "/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/mouse_selected_mt20260420"
+size_factors <- read_csv("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/size_factors_deseq_mt20260420.csv") %>%
   mutate(sample = paste(celltype, treatment, replicate, sep = "_"))
 
 # Split up pools ----------------------------------------------------------
@@ -52,5 +52,5 @@ for (group in names(files)) {
   
   data <- coverage(data) / factor
   data <- data[names(data) %in% seqnames]
-  export.bw(data, paste0("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/mouse_all/", group, ".bw"))
+  export.bw(data, paste0("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bigwig/mouse_selected_mt20260420/", group, ".bw"))
 }

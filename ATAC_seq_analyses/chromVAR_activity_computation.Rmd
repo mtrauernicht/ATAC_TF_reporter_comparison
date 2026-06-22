@@ -119,14 +119,14 @@ lmp <- function (modelobject) {
 
 ```{r out.width= "80%", fig.align= "center"}
 # Import peak count information for ChromVAR
-peak_count <- readRDS("~/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20250206.rds")
+peak_count <- readRDS("/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/rds/experiment_7784_20260420.rds")
 assayNames(peak_count) <- "counts"
 
 # Filter samples
 #peak_count <- peak_count[, peak_count@colData$celltype == "mES"] 
 peak_count <- peak_count[, peak_count@colData$treatment %in% c("2i_LIF", "NT", "CH", "POU5F1_DEG", "POU5F1_ctrl", "SOX2_DEG",
                                                                "SOX2_ctrl", "FBS", "FK", "Heat", "LIF", "LIF_1h", "LIF_3h",
-                                                               "LIF_6h", "TFCP2L1", "FOXA1_OE", "FOXA1_ctrl", "DMSO")] 
+                                                               "LIF_6h", "TFCP2L1", "FOXA1_OE", "FOXA1_ctrl", "DMSO", "FS_4h", "FS_24h", "HS", "Norm")] 
 peak_count <- peak_count[, peak_count@colData$basename != "1_mES_r3_TAAGGCGA-AGGCTTAG_S1"] 
 
 min_samples <- 1  # Adjust as needed
@@ -210,7 +210,7 @@ dev_scores <- deviations(dev) %>%
   distinct(motif_id, tf, condition, run, replicate, chromVAR_zscore_mean, chromVAR_zscore)
 
 dev_scores_ctrl <- dev_scores %>%
-  filter(condition %in% c("mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT")) %>%
+  filter(condition %in% c("mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT", "mNPC_DMSO", "mNPC_Norm")) %>%
   mutate(replicate = as.character(replicate)) %>%
   dplyr::select("ref_condition" = condition, "ctrl_zscore" = chromVAR_zscore, tf, replicate, run) %>%
   # mutate(replicate = ifelse(ref_condition == "NPC_DMSO", "R1", replicate)) %>%
@@ -220,10 +220,10 @@ dev_scores_ctrl <- dev_scores %>%
 
 condition_match <- data.frame(condition = c("mES_LIF", "mES_CH", "mES_FOXA1_OE", "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_TFCP2L1",
                                             "mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "mES_FBS",
-                                            "mES_FK", "mES_Heat", "NPC_DMSO"),
-                              ref_condition = c("mES_2i_LIF",  "mES_2i_LIF", "mES_FOXA1_ctrl", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT",
+                                            "mES_FK", "mES_Heat", "NPC_DMSO", "mNPC_FS_4h", "mNPC_FS_24h", "mNPC_HS"),
+                              ref_condition = c("mES_2i_LIF",  "mES_2i_LIF", "mES_2i_LIF", "mES_POU5F1_ctrl", "mES_SOX2_ctrl", "mES_NT",
                                                 "mES_NT", "mES_NT", "mES_NT", "mES_NT",
-                                                "mES_NT", "mES_NT", "mES_NT"))
+                                                "mES_NT", "mES_NT", "mES_NT", "mNPC_DMSO", "mNPC_DMSO", "mNPC_Norm"))
 
 dev_scores_dif <- dev_scores %>%
   mutate(replicate = as.character(replicate), replicate = ifelse(condition == "NPC_DMSO" & replicate == "R4", "R2", replicate)) %>%
@@ -232,7 +232,7 @@ dev_scores_dif <- dev_scores %>%
   mutate(chromVAR_zscore_dif = chromVAR_zscore - ctrl_zscore) %>%
   mutate(chromVAR_zscore_dif_mean = ave(chromVAR_zscore_dif, tf, condition, FUN = function (x) mean(x, na.rm = T))) %>%
   filter(condition %in% c("mES_CH", "mES_LIF", "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_FBS", "mES_FK", "mES_Heat",
-                          "mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "mES_TFCP2L1", "mES_FOXA1_OE", "NPC_DMSO"))
+                          "mES_LIF_1h", "mES_LIF_3h", "mES_LIF_6h", "mES_TFCP2L1", "mES_FOXA1_OE", "NPC_DMSO", "mNPC_FS_4h", "mNPC_FS_24h", "mNPC_HS"))
 
 devMat <- assays(dev)$deviations
 
@@ -258,14 +258,17 @@ contrast_list <- list(
   `LIF_3h_vs_NT` = c("LIF_3h", "NT"),
   `LIF_6h_vs_NT` = c("LIF_6h", "NT"),
   `TFCP2L1_vs_NT` = c("TFCP2L1", "NT"),
-  `FOXA1_OE_vs_ctrl` = c("FOXA1_OE", "FOXA1_ctrl"),
-  `NPC_mES` = c("DMSO", "NT")
+  `FOXA1_OE_vs_ctrl` = c("FOXA1_OE", "2i_LIF"),
+  `NPC_mES` = c("DMSO", "NT"),
+  `FS_4h_vs_DMSO` = c("FS_4h", "DMSO"),
+  `FS_24h_vs_DMSO` = c("FS_24h", "DMSO"),
+  `HS_vs_DMSO` = c("HS", "Norm")
 )
 
 # Run contrasts in a loop
 results_list <- list()
 
-for (i in 1:13) {
+for (i in 1:16) {
   
   print(i)
   
@@ -302,15 +305,20 @@ combined_top_table <- bind_rows(results_list) %>%
   left_join(motifs_selected) %>%
   dplyr::select(tf, "chromVAR_zscore_dif_mean" = logFC, "p_value_adjusted" = adj.P.Val, "condition" = group1) %>%
   mutate(condition = paste("mES_", condition, sep = "")) %>%
-  mutate(condition = ifelse(condition == "mES_DMSO", "NPC_DMSO", condition))
-
+  mutate(condition = ifelse(condition == "mES_DMSO", "NPC_DMSO", condition)) %>%
+  mutate(condition = ifelse(condition == "mES_FS_4h", "NPC_FS_4h", condition)) %>%  
+  mutate(condition = ifelse(condition == "mES_FS_24h", "NPC_FS_24h", condition)) %>%    
+  mutate(condition = ifelse(condition == "mES_HS", "NPC_HS", condition))
 
 dev_scores_dif <- dev_scores_dif %>%
+  mutate(condition = ifelse(condition == "mNPC_FS_24h", "NPC_FS_24h", condition)) %>%
+  mutate(condition = ifelse(condition == "mNPC_FS_4h", "NPC_FS_4h", condition)) %>%
+  mutate(condition = ifelse(condition == "mNPC_HS", "NPC_HS", condition)) %>%
   dplyr::select(-chromVAR_zscore_dif_mean) %>%
   left_join(combined_top_table)
 
 
-saveRDS(dev_scores_dif, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
+saveRDS(dev_scores_dif, "/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2026_mouse_all_npc.rds")
 ```
 
 ---
