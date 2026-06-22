@@ -1,6 +1,6 @@
 # Systematic comparison of estimates of transcription factor activity by ATAC-seq and multiplexed reporter assays
 
-<a href="https://doi.org/10.5281/zenodo.18019661"><img src="https://zenodo.org/badge/819850868.svg" alt="DOI"></a>
+<a href="https://doi.org/10.5281/zenodo.18019661"><img src="https://zenodo.org/badge/819850868.svg" alt="Zenodo DOI"></a>
 
 ## Overview
 
@@ -15,7 +15,7 @@ This repository contains the analysis and code for comparing transcription facto
 ## Project Structure
 
 - **`ATAC_reporter_TF_activity_comparison.Rmd`**: Contains all code used to make Figures. 
-- **`/ATAC_seq_analyses/`**: Contains all analysis pipelines to analyze the raw ATAC-seq data and the analysis using chromVAR.
+- **`/ATAC_seq_analyses/`**: Contains all analysis pipelines to analyze the raw ATAC-seq data and the analysis using chromVAR and TOBIAS.
 - **`/TF_reporter_analyses/`**: Contains computation of TF activity from TF reporter assays using primetime.
 
 
