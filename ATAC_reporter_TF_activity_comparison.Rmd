@@ -477,6 +477,13 @@ tf_activity_chromVAR_dev <- prime_activities_comb %>%
   mutate(condition = ifelse(condition == "mES_LIF6", "mES_LIF_6h", condition)) %>%
   mutate(condition = ifelse(condition == "mES_LIF3", "mES_LIF_3h", condition)) %>%
   mutate(condition = ifelse(condition == "mES_NPC", "NPC_DMSO", condition)) %>%
+  mutate(tf = gsub("ELK1_A", "ELK1", tf)) %>%
+  mutate(tf = gsub("ELK1_B", "ELK1", tf)) %>%
+  mutate(logFC = ave(logFC, tf, condition, FUN = mean)) %>%
+  mutate(p_adjusted = ave(p_adjusted, tf, condition, FUN = mean)) %>%
+  mutate(sig = ifelse(p_adjusted < 0.05 & logFC > 0, "Upregulated", "NS"),
+         sig = ifelse(p_adjusted < 0.05 & logFC < 0, "Downregulated", sig)) %>%
+  distinct() %>%
   filter(!condition %in% c("mES_PMA", "mES_SP1", "NPC_FK", "NPC_HQ")) %>%
   left_join(chromvar_scores_mouse_added_all %>% 
               mutate(chromVAR_zscore_dif_mean = ifelse(condition == "mES_FOXA1_OE", chromVAR_zscore_dif, chromVAR_zscore_dif_mean)) %>%
