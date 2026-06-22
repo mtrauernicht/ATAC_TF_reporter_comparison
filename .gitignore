@@ -73,3 +73,4 @@ TF_reporter_analyses/primetime/**/tmp_primetime/
 TF_reporter_analyses/primetime/**/tmp_primetime/**
 TF_reporter_analyses/primetime/.snakemake/
 TF_reporter_analyses/primetime/primetime_v1.0.0/
+ATAC_seq_analyses/rds/*.rds
