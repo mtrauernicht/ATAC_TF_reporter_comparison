@@ -1,6 +1,6 @@
 # Systematic comparison of estimates of transcription factor activity by ATAC-seq and multiplexed reporter assays
 
-https://zenodo.org/badge/DOI/10.5281/zenodo.18127479.svg
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18127479.svg)](https://doi.org/10.5281/zenodo.18127479)
 
 ## Overview
 
