@@ -1,0 +1,29 @@
+
+data:
+  mNPC_HS: [/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES_selected_mt20260420/8641_11_mNPC_HS_R3_TAAGGCGA-TCTACTCT_S11.bam,/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES_selected_mt20260420/8641_4_mNPC_HS_R1_TCCTGAGC-TCTACTCT_S4.bam,/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES_selected_mt20260420/8641_6_mNPC_HS_R2_TAGGCATG-TATGCAGT_S6.bam]
+  mNPC_norm: [/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES_selected_mt20260420/8641_10_mNPC_norm_R3_TAAGGCGA-AGAGGATA_S10.bam,/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES_selected_mt20260420/8641_5_mNPC_norm_R2_GGACTCCT-CTCCTTAC_S5.bam]
+  
+run_info:
+  organism: mouse
+  fasta: /DATA/scratch/usr/t.v.schaik/data/genomes/mm10/mm10.fa
+  blacklist: /home/v.franceschini/Projects/2026_PRIMETIME_VS_ATAC/00_running_tobias/data/mm10-blacklist.v2.bed        
+  gtf: /DATA/usr/m.trauernicht/data/genomes/mm10/gencode.vM10.annotation.gtf                       
+  motifs: /home/v.franceschini/Projects/2026_PRIMETIME_VS_ATAC/00_running_tobias/data/motifs_selected_TF_reporters.jaspar          
+  output: /DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/VF260303_TOBIAS/01_TOBIAS_OUTPUT/mNPC_norm_vs_mNPC_HS  #contrast_vs_reference
+
+#Flags for parts of pipeline to include/exclude (all are True by default)
+flags:
+  plot_comparison: True #True/False
+  plot_correction: True
+  plot_venn: True
+  coverage: True
+  wilson: True
+
+#-------------------------------------------------------------------------#
+#----------------------- Default module parameters -----------------------#
+#-------------------------------------------------------------------------#
+
+macs: "--nomodel --shift -100 --extsize 200 --broad"
+atacorrect: ""
+footprinting: ""
+bindetect: ""

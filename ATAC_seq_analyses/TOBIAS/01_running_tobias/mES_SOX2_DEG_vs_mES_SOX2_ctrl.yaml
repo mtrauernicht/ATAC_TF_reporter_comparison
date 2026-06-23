@@ -1,0 +1,29 @@
+
+data:
+  mES_SOX2_ctrl: [/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES/7822_10_mES_SOX2_ctrl_r1_TAAGGCGA-AGAGGATA_S10.bam, /DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES/7784_8_mES_SOX2_ctrl_r1_CAGAGAGG-ATAGAGAG_S8.bam, /DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES/7784_18_mES_SOX2_ctrl_r2_CAGAGAGG-CTCCTTAC_S18.bam]  #list of .bam-files ref condition
+  mES_SOX2_DEG: [/DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES/7822_9_mES_SOX2_DEG_r1_CAGAGAGG-ATAGAGAG_S9.bam, /DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES/7784_7_mES_SOX2_DEG_r1_CTCTCTAC-ATAGAGAG_S7.bam, /DATA/usr/m.trauernicht/projects/ATAC_TF_reporter_comparison/ATAC_seq_analyses/bam/mES/7784_17_mES_SOX2_DEG_r2_CTCTCTAC-CTCCTTAC_S17.bam]  #list of .bam-files contrast condition
+  
+run_info:
+  organism: mouse
+  fasta: /DATA/scratch/usr/t.v.schaik/data/genomes/mm10/mm10.fa
+  blacklist: /home/v.franceschini/Projects/2026_PRIMETIME_VS_ATAC/00_running_tobias/data/mm10-blacklist.v2.bed        
+  gtf: /DATA/usr/m.trauernicht/data/genomes/mm10/gencode.vM10.annotation.gtf                       
+  motifs: /home/v.franceschini/Projects/2026_PRIMETIME_VS_ATAC/00_running_tobias/data/motifs_selected_TF_reporters.jaspar          
+  output: /DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/ATAC_seq_analyses/VF260303_TOBIAS/01_TOBIAS_OUTPUT/mES_SOX2_DEG_vs_mES_SOX2_ctrl  #contrast_vs_reference
+
+#Flags for parts of pipeline to include/exclude (all are True by default)
+flags:
+  plot_comparison: True #True/False
+  plot_correction: True
+  plot_venn: True
+  coverage: True
+  wilson: True
+
+#-------------------------------------------------------------------------#
+#----------------------- Default module parameters -----------------------#
+#-------------------------------------------------------------------------#
+
+macs: "--nomodel --shift -100 --extsize 200 --broad"
+atacorrect: ""
+footprinting: ""
+bindetect: ""

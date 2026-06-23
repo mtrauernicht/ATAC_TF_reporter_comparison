@@ -1,0 +1,423 @@
+---
+title: "VF260414_updating_figures_from_manuscript"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Loading libraries
+    
+```{r libraries}
+supressPackageStartupMessages(
+{library(RColorBrewer)
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(pheatmap)
+library(visNetwork)
+library(ggbeeswarm)
+library(ggforce)
+library(viridis)
+library(purrr)
+library(plyr)
+library(igraph)
+library(ggraph)
+library(cowplot)
+library(gridExtra)
+library(pROC)
+library(tidyr)
+library(stringr)
+library(ggrastr)
+library(readr)
+library(ggh4x)
+library(ggiraph)
+library(plotly)
+library(ggrepel)
+library(Matrix)
+library(SummarizedExperiment)
+library(BiocParallel)
+library(ggnewscale)
+library(tidyverse)})
+```
+
+
+
+### Loading the data
+
+
+```{r loading}
+primetf <- read.table("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/TF_reporter_analyses/data/mt20260101_prime_reporter_activities_combined.csv", header=T, sep=",")
+tobias <- readRDS("VF260305_TOBIAS_results_reshaped.rds") %>% as_tibble()
+chromvar <- readRDS("/DATA/shared/projects/TF_REPORTERS/ATAC_TF_reporter_comparison/data/chromVAR/dev_scores_mouse_2025b_mouse_all_npc.rds")
+
+
+# Parsing
+primetf_parsed = 
+    primetf %>%
+    mutate(condition = ifelse(condition == "mES_LIF1", "mES_LIF_1h", condition)) %>%
+    mutate(condition = ifelse(condition == "mES_LIF6", "mES_LIF_6h", condition)) %>%
+    mutate(condition = ifelse(condition == "mES_LIF3", "mES_LIF_3h", condition)) %>%
+    distinct(tf, condition, logFC, p_adjusted, sig) %>%
+    mutate(primetime_logFC=logFC, 
+           primetime_sig = sig,  
+           primetime_pvalue = p_adjusted, .keep='unused')
+
+
+chromvar_parsed =
+    chromvar%>% 
+    mutate(chromVAR_FC = ifelse(condition == "mES_FOXA1_OE", 
+                                chromVAR_zscore_dif, 
+                                chromVAR_zscore_dif_mean),
+           chromVAR_pvalue = p_value_adjusted, 
+           tf=tf,
+           condition=condition,
+           .keep='unused') %>%
+    mutate(condition = ifelse(condition == "NPC_DMSO", "mES_NPC", condition)) %>%
+    distinct(tf, condition, chromVAR_FC, chromVAR_pvalue)
+
+tobias_parsed =
+    tobias %>%
+    select(-motif_id, -ctrl_score, -ref_condition, -mean_score) %>%
+    mutate(tobias_pvalue = p_value_adjusted, 
+           tobias_log2FC = tobias_l2fc, .keep='unused') %>%
+    mutate(condition = ifelse(condition == "NPC_DMSO", "mES_NPC", condition))
+
+
+activities_combined = 
+    primetf_parsed %>%
+    left_join(chromvar_parsed) %>%
+    # fill chromVAR
+    left_join(tobias_parsed) 
+
+```
+
+
+
+
+
+
+### Figure EV3b
+
+```{r figure_eve3b}
+
+target_conditions <- data.frame(condition = c("mES_CH", "mES_FOXA1_OE", "mES_LIF",
+                                              "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_FBS",
+                                              "mES_FK", "mES_Heat", "mES_TFCP2L1"),
+                                tf = c("TCF7", "FOXA1", "STAT3",
+                                       "POU5F1::SOX2", "SOX2", "SRF",
+                                       "CREB1", "HSF1", "TFCP2L1")) %>%
+    mutate(target = T)
+
+
+target_ranks <-
+    activities_combined %>%
+    mutate(chromVAR_sig = -log10(chromVAR_pvalue) * abs(chromVAR_FC)) %>%
+    mutate(primetime_sig = -log10(primetime_pvalue) * abs(primetime_logFC)) %>%
+    mutate(tobias_sig = -log10(tobias_pvalue) * abs(tobias_log2FC)) %>%
+    # mutate(chromVAR_sig = ifelse(condition == "mES_FOXA1_OE", tobias_log2FC, chromVAR_sig)) %>%
+    left_join(target_conditions) %>%
+    mutate(target = ifelse(is.na(target), F, T)) %>%
+    group_by(condition) %>%
+    mutate(primetime_rank = rank(-primetime_sig),
+           chromVAR_rank = rank(-chromVAR_sig),
+           tobias_rank = rank(-tobias_sig)) %>%
+    ungroup() %>%
+    distinct(tf, condition, primetime_rank, chromVAR_rank, tobias_rank, target) %>%
+    filter(target)
+
+# ggplot(target_ranks,
+#        aes(x = chromVAR_rank, y = primetime_rank)) +
+#   geom_point(size = 3) +
+#   geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+#   geom_text_repel(aes(label = tf), size = 3) +
+#   labs(x = "chromVAR rank", y = "primeTF rank") +
+#   xlim(0, 100) +
+#   ylim(0, 100) +
+#   theme(aspect.ratio = 1)
+
+# Generate a heatmap with the ranks (using pheatmap)
+# 
+# 
+
+
+
+target_ranks_matrix <- target_ranks %>%
+    distinct(tf, chromVAR_rank, primetime_rank, tobias_rank) %>%
+    column_to_rownames("tf") %>%
+    as.matrix() %>%
+    t() %>%
+    round(0)
+
+# clustering
+row_order <- hclust(dist(target_ranks_matrix))$order
+col_order <- hclust(dist(t(target_ranks_matrix)))$order
+
+target_ranks_matrix <- target_ranks_matrix[row_order, col_order]
+
+df_long <- as.data.frame(target_ranks_matrix) %>%
+    tibble::rownames_to_column("method") %>%
+    pivot_longer(-method, names_to = "tf", values_to = "rank")
+
+df_long$method <- factor(df_long$method, levels = unique(df_long$method))
+df_long$tf <- factor(df_long$tf, levels = unique(df_long$tf))
+
+ggplot(df_long, aes(y = tf, x = method, fill = rank)) +
+    geom_tile() +
+    geom_text(aes(label = rank), size = 4, color='white') +
+    scale_fill_gradientn(
+        colors = viridis(50),
+        breaks = c(seq(0, 10, length.out = 26), seq(11, 80, length.out = 25))
+    ) +
+    labs(title = "",
+         x = NULL, y = NULL) +
+    theme_void() + 
+    theme(
+        axis.text.x = element_text(angle = 90, hjust = 1, size = 8),
+        axis.text.y = element_text(size = 8, vjust=1)) + coord_equal()
+
+```
+
+
+
+
+
+### Fig EV4
+
+```{r theme}
+
+
+theme_custom <- theme(
+  text = element_text(size = 12),
+  
+  # Remove panel background
+  panel.background = element_blank(),
+  
+  # Customize grid lines: Keep both major X and Y grid lines, make them thinner
+  panel.grid = element_blank(),
+  panel.grid.major = element_blank(),
+  
+  # Ensure axis lines and ticks are visible
+  axis.line = element_line(colour = "black"),
+  axis.ticks = element_line(colour = "black"),
+  
+  # Make axis ticks longer
+  axis.ticks.length = unit(7, "pt"),  # Adjust the length as needed
+  
+  # Add an outside border to the plotting area
+  panel.border = element_rect(colour = "black", fill = NA, size = .5),
+  
+  # Ensure facet (strip) outline matches the panel border thickness
+  strip.background = element_rect(fill = "#b0b1b3", colour = "black", size = 1),
+  strip.text = element_text(face = "bold", color="white"),
+  
+  # Adjust plot layout
+  plot.title.position = "plot",
+  legend.position = "top",
+  legend.title = element_blank()
+)
+
+theme_set(theme_minimal() + theme_custom)
+```
+
+
+
+```{r figure_ev4}
+
+library(ggpubr)
+
+activities_combined %>%
+    filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF",
+                          "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_FBS",
+                          "mES_FK", "mES_Heat", "mES_TFCP2L1")) %>%
+    mutate(condition = factor(condition, levels = c("mES_CH", "mES_LIF", "mES_SOX2_DEG",
+                                                         "mES_POU5F1_DEG", "mES_TFCP2L1", "mES_FBS",
+                                                         "mES_FK", "mES_FOXA1_OE", "mES_Heat"))) %>%
+    left_join(target_conditions) %>%
+    ggplot(aes(x = chromVAR_FC, y = tobias_log2FC, color=target, alpha=target)) +
+  # Draw dashed lines in zero
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  geom_point(aes(x = chromVAR_FC, y = tobias_log2FC), size=3, shape=21, fill=NA, color="black", alpha=0.5, linewidth=0.5, inherit.aes = F) +
+  # Dots with black outline (x_sig = TRUE)
+  geom_point(size=3) +
+  scale_color_manual(values = c("TRUE" = "red", "FALSE" = "gray"), guide = "none") +
+  scale_alpha_manual(values = c("TRUE" = 1, `FALSE` = 0.5), guide = "none") +
+  geom_smooth(method = "lm", color = "black", linewidth=0.5) +
+    stat_cor(method = "pearson", 
+             aes(label = paste(after_stat(r.label),
+                               sep="~`,`~"))) +
+  theme(aspect.ratio = 1) +
+  facet_wrap(~condition) +
+    labs(x = "chromVAR Z-score difference", y = "TOBIAS log2FC")
+
+```
+
+
+
+
+```{r figev4c}
+pdf('corr.pdf', height=10, width=10)
+activities_combined %>%
+  filter(condition %in% c("mES_CH", "mES_FOXA1_OE", "mES_LIF",
+  "mES_POU5F1_DEG", "mES_SOX2_DEG", "mES_FBS",
+  "mES_FK", "mES_Heat", "mES_TFCP2L1")) %>%
+  mutate(condition = factor(condition, levels = c("mES_CH", "mES_LIF", "mES_SOX2_DEG",
+  "mES_POU5F1_DEG", "mES_TFCP2L1", "mES_FBS",
+  "mES_FK", "mES_FOXA1_OE", "mES_Heat")),
+  y_sig = !is.na(primetime_pvalue) & primetime_pvalue < 0.05,
+  x_sig = !is.na(tobias_pvalue) & tobias_pvalue < 0.0005, #!!!!
+  low_sig = !(x_sig | y_sig)) %>%
+  ggplot(aes(x = tobias_log2FC, y = primetime_logFC)) +
+    # Draw dashed lines in zero
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_text_repel(aes(label = tf, color=primetime_sig), box.padding = 0.5, max.overlaps = 30) +
+  # Dots with NO outline (x_sig = FALSE)
+  geom_point(data = ~ subset(., !x_sig),
+  aes(fill = primetime_sig, alpha = low_sig),
+  shape = 21, size = 3, stroke = 0) +
+  # Dots with black outline (x_sig = TRUE)
+  geom_point(data = ~ subset(., x_sig),
+  aes(fill = primetime_sig, alpha = low_sig),
+  shape = 21, size = 3, stroke = .7, color = "black") +
+  geom_smooth(method = "lm", color = "black", linewidth=0.5) +
+  # labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
+  scale_fill_manual(values = c("Downregulated" = "#6495ED",
+  "NS" = "grey80",
+  "Upregulated" = "#F37F80"), aesthetics = c("fill", "color")) +
+  scale_alpha_manual(values = c(`TRUE` = 0.5, `FALSE` = 1), guide = "none") +
+  theme(aspect.ratio = 1) +
+  facet_wrap(~condition) +
+      labs(x = "Activity fold-change (log2FC)\n(TOBIAS)", y = "Activity fold-change (log2FC)\n(primeTF)") 
+dev.off()
+```
+
+
+### Fig EV5
+
+
+```{r figure_ev5C}
+library(patchwork)
+
+activities_combined %>% 
+         filter(tf %in% c("POU5F1::SOX2", "SOX2", "TCF7",
+                          "STAT3", "KLF4", "TFCP2L1", "POU5F1",
+                          "ESRRB", "SMAD4"),
+                condition == "mES_NPC") %>% select(-primetime_sig) %>%
+     mutate(tf = fct_reorder(tf, primetime_logFC, .desc = T)) %>%
+            pivot_longer(
+    cols = -c(tf, condition),
+    names_to = c("method", ".value"),
+    names_pattern = "(primetime|chromVAR|tobias)_(logFC|pvalue|FC|log2FC)"
+  ) %>%
+  mutate(
+    FC = coalesce(logFC, log2FC, FC),
+    pvalue = pvalue
+  ) %>%
+  select(tf, condition, method, pvalue, FC) %>%
+    mutate(sig = ifelse(pvalue < 0.05, ifelse(FC > 0, "Upregulated", "Downregulated"), "NS")) -> plot_df
+
+
+plot_df %>% filter(method == "primetime") %>%
+ggplot(aes(x = tf, y = FC, fill = sig)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed") +  # Add a vertical line at x = 0
+  coord_flip() +  # Flip the plot to make it horizontal
+  scale_y_continuous(labels = abs) +  # Display positive labels for both sides
+  labs(x = "Target TF", y = "Activity fold-change(log2)", title = "primetime") +
+  scale_fill_manual(values = c("Upregulated" = "#F37F80", "NS" = "grey80", "Downregulated" = "#6495ED")) +
+  theme(aspect.ratio = 2, legend.position = "none", plot.title = element_text(hjust = 0.5)) +
+  ylim(-6,6) +
+    plot_df %>% filter(method == "chromVAR") %>%
+ggplot(aes(x = tf, y = FC, fill = sig)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed") +  # Add a vertical line at x = 0
+  coord_flip() +  # Flip the plot to make it horizontal
+  scale_y_continuous(labels = abs) +  # Display positive labels for both sides
+  labs(x = "", y = "Activity difference", title = "ChromVAR") +
+  scale_fill_manual(values = c("Upregulated" = "#F37F80", "NS" = "grey80", "Downregulated" = "#6495ED")) +
+  theme(aspect.ratio = 2, axis.text.y = element_blank(), , axis.ticks.y = element_blank(), legend.position = "none", plot.title = element_text(hjust = 0.5)) +
+  ylim(-0.3,0.3) +
+    plot_df %>% filter(method == "tobias") %>%
+ggplot(aes(x = tf, y = FC, fill = sig)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_hline(yintercept = 0, linetype = "dashed") +  # Add a vertical line at x = 0
+  coord_flip() +  # Flip the plot to make it horizontal
+  scale_y_continuous(labels = abs) +  # Display positive labels for both sides
+  labs(x = "", y = "Activity fold-change(log2)", title = "TOBIAS") +
+  scale_fill_manual(values = c("Upregulated" = "#F37F80", "NS" = "grey80", "Downregulated" = "#6495ED")) +
+  theme(aspect.ratio = 2, axis.text.y = element_blank(), , axis.ticks.y = element_blank(), legend.position = "none", plot.title = element_text(hjust = 0.5)) +
+  ylim(-0.5,0.5) 
+
+
+```
+
+
+
+
+```{r figev5D}
+
+
+
+# Old plot for max to check
+ggplot(activities_combined %>%
+         filter(condition %in% c("mES_NPC")) %>%
+         mutate(x_sig = !is.na(primetime_pvalue) & primetime_pvalue < 0.05,
+                y_sig = primetime_sig != "NS",
+                low_sig = !(x_sig | y_sig)),  # insignificant for both metrics
+       aes(x = chromVAR_FC, y = primetime_logFC)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_text_repel(aes(label = tf), box.padding = 0.5) +
+  # Dots with NO outline (x_sig = FALSE)
+  geom_point(data = ~ subset(., !x_sig),
+             aes(fill = primetime_sig, alpha = low_sig),
+             shape = 21, size = 3, stroke = 0) +
+  # Dots with black outline (x_sig = TRUE)
+  geom_point(data = ~ subset(., x_sig),
+             aes(fill = primetime_sig, alpha = low_sig),
+             shape = 21, size = 3, stroke = .7, color = "black") +
+  geom_smooth(method = "lm", color = "black") +
+  # labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
+  scale_fill_manual(values = c("Downregulated" = "#6495ED", 
+                               "NS" = "grey80", 
+                               "Upregulated" = "#F37F80")) +
+  scale_alpha_manual(values = c(`TRUE` = 0.5, `FALSE` = 1), guide = "none") +
+  theme(aspect.ratio = 1) +
+    xlim(-.5,1) + 
+    facet_wrap(~condition) 
+
+
+ggplot(activities_combined %>%
+         filter(condition %in% c("mES_NPC")) %>%
+         mutate(x_sig = !is.na(tobias_pvalue) & tobias_pvalue < 0.05,
+                y_sig = primetime_sig != "NS",
+                low_sig = !(x_sig | y_sig)),  # insignificant for both metrics
+       aes(x = tobias_log2FC, y = primetime_logFC)) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_text_repel(aes(label = tf, color=primetime_sig), box.padding = 0.5) +
+  # Dots with NO outline (x_sig = FALSE)
+  geom_point(data = ~ subset(., !x_sig),
+             aes(fill = primetime_sig, alpha = low_sig),
+             shape = 21, size = 3, stroke = 0) +
+  # Dots with black outline (x_sig = TRUE)
+  geom_point(data = ~ subset(., x_sig),
+             aes(fill = primetime_sig, alpha = low_sig),
+             shape = 21, size = 3, stroke = .7, color = "black") +
+  geom_smooth(method = "lm", color = "black") +
+  # labs(x = "chromVAR deviation z-score dif", y = "Reporter activity (FC)") +
+  scale_fill_manual(values = c("Downregulated" = "#6495ED", 
+                               "NS" = "grey80", 
+                               "Upregulated" = "#F37F80"), aesthetics = c("fill", "color")) +
+  scale_alpha_manual(values = c(`TRUE` = 0.5, `FALSE` = 1)) +
+  theme(aspect.ratio = 1) +
+    facet_wrap(~condition) +
+    labs(x = "Activity fold-change (log2FC)\n(TOBIAS)", 
+         y = "Activity fold-change (log2FC)\n(primeTF)")
+
+
+```
